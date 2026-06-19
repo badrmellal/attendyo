@@ -18,7 +18,7 @@ Sold once. Owned forever. Runs on your own LAN — no cloud, no subscription, no
 
 <br>
 
-<img src="docs/screenshots/gate-idle.png" alt="Liwan Gate — the live camera framed inside a Moroccan arch, 'Regardez la caméra'" width="760">
+<img src="docs/screenshots/gate-idle.png" alt="Liwan Gate | the live camera framed inside a Moroccan arch, 'Regardez la caméra'" width="760">
 
 <sub>The Gate kiosk at rest — a face appears inside the arched threshold; the door opens when Liwan knows them.</sub>
 
@@ -263,5 +263,5 @@ liwan/
 ---
 
 <div align="center">
-<sub>Liwan · لِيوان — sovereign by default. Your faces, your doors, your data, your LAN.</sub>
+<sub>Liwan · لِيوان | sovereign by default. Your faces, your doors, your data, your LAN.</sub>
 </div>
