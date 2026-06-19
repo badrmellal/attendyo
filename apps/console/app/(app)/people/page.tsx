@@ -7,15 +7,34 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
-import { Search, UserPlus, Users, Filter, Mail, Phone } from "lucide-react";
+import {
+  Search,
+  UserPlus,
+  Users,
+  Filter,
+  Mail,
+  Phone,
+  Pencil,
+  PauseCircle,
+  PlayCircle,
+  Trash2,
+} from "lucide-react";
 import { DataTable, type Column } from "@/components/DataTable";
 import { EnrollDialog } from "@/components/EnrollDialog";
+import { MemberDialog } from "@/components/MemberDialog";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { RowMenu, type RowAction } from "@/components/RowMenu";
 import { EmptyState } from "@/components/EmptyState";
 import { Avatar } from "@/components/Avatar";
 import { Pill } from "@/components/StatusPill";
 import { useBranding } from "@/components/BrandingProvider";
-import { listMembers } from "@/lib/api";
-import type { Member, MemberStatus, MemberType } from "@/lib/types";
+import {
+  deleteMember,
+  listAccessGroups,
+  listMembers,
+  updateMember,
+} from "@/lib/api";
+import type { AccessGroup, Member, MemberStatus, MemberType } from "@/lib/types";
 import { cn, humanize } from "@/lib/utils";
 
 const STATUS_TONE: Record<MemberStatus, "ok" | "warn" | "muted"> = {
@@ -46,6 +65,10 @@ export default function PeoplePage() {
   const [type, setType] = useState<MemberType | "">("");
   const [department, setDepartment] = useState("");
   const [enrollOpen, setEnrollOpen] = useState(false);
+  const [accessGroups, setAccessGroups] = useState<AccessGroup[]>([]);
+  const [editing, setEditing] = useState<Member | null>(null);
+  const [deleting, setDeleting] = useState<Member | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   function refresh() {
     setLoading(true);
@@ -56,7 +79,26 @@ export default function PeoplePage() {
 
   useEffect(() => {
     refresh();
+    listAccessGroups().then(setAccessGroups).catch(() => setAccessGroups([]));
   }, []);
+
+  // Quick suspend <-> activate toggle.
+  async function toggleStatus(m: Member) {
+    const next: MemberStatus = m.status === "active" ? "suspended" : "active";
+    setBusyId(m.id);
+    try {
+      const saved = await updateMember(m.id, { status: next });
+      setMembers((prev) => prev.map((x) => (x.id === m.id ? { ...x, ...saved } : x)));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function confirmDelete() {
+    if (!deleting) return;
+    await deleteMember(deleting.id);
+    setMembers((prev) => prev.filter((x) => x.id !== deleting.id));
+  }
 
   const departments = useMemo(
     () =>
@@ -140,6 +182,35 @@ export default function PeoplePage() {
           <Pill tone={STATUS_TONE[m.status]}>{STATUS_LABEL[m.status]}</Pill>
         </div>
       ),
+    },
+    {
+      key: "actions",
+      header: "",
+      align: "right",
+      className: "w-12",
+      cell: (m) => {
+        const suspendable = m.status === "active";
+        const actions: RowAction[] = [
+          { label: "Modifier", icon: Pencil, onSelect: () => setEditing(m) },
+          {
+            label: suspendable ? "Suspendre" : "Activer",
+            icon: suspendable ? PauseCircle : PlayCircle,
+            disabled: busyId === m.id,
+            onSelect: () => toggleStatus(m),
+          },
+          {
+            label: "Supprimer",
+            icon: Trash2,
+            tone: "danger",
+            onSelect: () => setDeleting(m),
+          },
+        ];
+        return (
+          <div className="flex justify-end">
+            <RowMenu actions={actions} label={`Actions pour ${m.full_name}`} />
+          </div>
+        );
+      },
     },
   ];
 
@@ -256,6 +327,34 @@ export default function PeoplePage() {
         onClose={() => setEnrollOpen(false)}
         departments={departments}
         onEnrolled={(m) => setMembers((prev) => [m, ...prev])}
+      />
+
+      <MemberDialog
+        open={editing !== null}
+        member={editing}
+        accessGroups={accessGroups}
+        departments={departments}
+        onClose={() => setEditing(null)}
+        onSaved={(saved) =>
+          setMembers((prev) => prev.map((m) => (m.id === saved.id ? { ...m, ...saved } : m)))
+        }
+      />
+
+      <ConfirmDialog
+        open={deleting !== null}
+        onClose={() => setDeleting(null)}
+        onConfirm={confirmDelete}
+        title="Supprimer la personne"
+        confirmLabel="Supprimer"
+        description={
+          <>
+            <p>
+              Supprimer <span className="font-medium text-text">{deleting?.full_name}</span> ?
+              Cette action retire aussi le sujet facial associé (CompreFace) et est
+              irréversible.
+            </p>
+          </>
+        }
       />
     </div>
   );

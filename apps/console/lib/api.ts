@@ -9,10 +9,13 @@
 
 import type {
   AccessEvent,
+  AccessGroup,
   AttendanceDay,
   AuthUser,
   Camera,
+  CameraDraft,
   Door,
+  DoorDraft,
   HealthStatus,
   LoginResponse,
   Member,
@@ -23,15 +26,25 @@ import type {
 } from "./types";
 import {
   MOCK_ATTENDANCE,
-  MOCK_CAMERAS,
-  MOCK_DOORS,
   MOCK_EVENTS,
+  addMockCamera,
+  addMockDoor,
   addMockMember,
+  deleteMockCamera,
+  deleteMockDoor,
+  deleteMockMember,
+  getMockAccessGroups,
+  getMockCameras,
+  getMockDoors,
   getMockMembers,
   getMockSettings,
+  mockId,
   mockTodayStats,
   nextLiveEvent,
   putMockSettings,
+  updateMockCamera,
+  updateMockDoor,
+  updateMockMember,
 } from "./mock";
 import { hoursDecimal, todayISO } from "./utils";
 
@@ -258,10 +271,13 @@ export async function updateMember(id: string, patch: Partial<Member>): Promise<
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(patch),
       }),
-    () => {
-      const m = getMockMembers().find((x) => x.id === id);
-      if (!m) throw new ApiError(404, "Member not found");
-      return { ...m, ...patch };
+    async () => {
+      await delay(350);
+      try {
+        return updateMockMember(id, patch);
+      } catch {
+        throw new ApiError(404, "Member not found");
+      }
     },
   );
 }
@@ -269,7 +285,22 @@ export async function updateMember(id: string, patch: Partial<Member>): Promise<
 export async function deleteMember(id: string): Promise<void> {
   return withMock(
     () => request<void>(`/api/members/${id}`, { method: "DELETE" }),
-    async () => undefined,
+    async () => {
+      await delay(300);
+      // Server-side this also removes the CompreFace subject; the UI just deletes.
+      deleteMockMember(id);
+    },
+  );
+}
+
+// --------------------------------------------------------------------------
+// Access groups — used to populate the member access-group selector.
+// CONTRACT.md references `access_group_id` on Member; the list is read-only here.
+// --------------------------------------------------------------------------
+export async function listAccessGroups(): Promise<AccessGroup[]> {
+  return withMock(
+    () => request<AccessGroup[]>("/api/access-groups"),
+    () => getMockAccessGroups(),
   );
 }
 
@@ -432,14 +463,112 @@ export async function getTodayStats(): Promise<TodayStats> {
 export async function listDoors(): Promise<Door[]> {
   return withMock(
     () => request<Door[]>("/api/doors"),
-    () => MOCK_DOORS,
+    () => getMockDoors(),
+  );
+}
+
+export async function createDoor(draft: DoorDraft): Promise<Door> {
+  return withMock(
+    () =>
+      request<Door>("/api/doors", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(draft),
+      }),
+    async () => {
+      await delay(400);
+      const door: Door = {
+        id: mockId(),
+        ...draft,
+        created_at: new Date().toISOString(),
+      };
+      return addMockDoor(door);
+    },
+  );
+}
+
+export async function updateDoor(id: string, patch: Partial<DoorDraft>): Promise<Door> {
+  return withMock(
+    () =>
+      request<Door>(`/api/doors/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      }),
+    async () => {
+      await delay(350);
+      try {
+        return updateMockDoor(id, patch);
+      } catch {
+        throw new ApiError(404, "Door not found");
+      }
+    },
+  );
+}
+
+export async function deleteDoor(id: string): Promise<void> {
+  return withMock(
+    () => request<void>(`/api/doors/${id}`, { method: "DELETE" }),
+    async () => {
+      await delay(300);
+      deleteMockDoor(id);
+    },
   );
 }
 
 export async function listCameras(): Promise<Camera[]> {
   return withMock(
     () => request<Camera[]>("/api/cameras"),
-    () => MOCK_CAMERAS,
+    () => getMockCameras(),
+  );
+}
+
+export async function createCamera(draft: CameraDraft): Promise<Camera> {
+  return withMock(
+    () =>
+      request<Camera>("/api/cameras", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(draft),
+      }),
+    async () => {
+      await delay(400);
+      const camera: Camera = {
+        id: mockId(),
+        ...draft,
+        created_at: new Date().toISOString(),
+      };
+      return addMockCamera(camera);
+    },
+  );
+}
+
+export async function updateCamera(id: string, patch: Partial<CameraDraft>): Promise<Camera> {
+  return withMock(
+    () =>
+      request<Camera>(`/api/cameras/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      }),
+    async () => {
+      await delay(350);
+      try {
+        return updateMockCamera(id, patch);
+      } catch {
+        throw new ApiError(404, "Camera not found");
+      }
+    },
+  );
+}
+
+export async function deleteCamera(id: string): Promise<void> {
+  return withMock(
+    () => request<void>(`/api/cameras/${id}`, { method: "DELETE" }),
+    async () => {
+      await delay(300);
+      deleteMockCamera(id);
+    },
   );
 }
 

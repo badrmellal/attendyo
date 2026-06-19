@@ -210,6 +210,26 @@ class CameraUpdate(BaseModel):
     enabled: Optional[bool] = None
 
 
+class AccessGroup(BaseModel):
+    id: str
+    name: str
+    door_ids: list[str] = Field(default_factory=list)
+    schedule: dict = Field(default_factory=dict)
+    created_at: datetime
+
+
+class AccessGroupCreate(BaseModel):
+    name: str
+    door_ids: list[str] = Field(default_factory=list)
+    schedule: dict = Field(default_factory=dict)
+
+
+class AccessGroupUpdate(BaseModel):
+    name: Optional[str] = None
+    door_ids: Optional[list[str]] = None
+    schedule: Optional[dict] = None
+
+
 # --------------------------------------------------------------------------- #
 # Stats
 # --------------------------------------------------------------------------- #

@@ -100,6 +100,13 @@ type RecognizeResult = {
 - `POST /api/doors/{id}/open` → manually pulse the door (test button)
 - `GET/POST /api/cameras`, `PATCH/DELETE /api/cameras/{id}`
 
+### Access groups
+- `GET/POST /api/access-groups`, `PATCH/DELETE /api/access-groups/{id}`
+  - `AccessGroup = { id, name, door_ids: string[], schedule: object, created_at }`.
+    `door_ids` empty ⇒ all doors; `schedule` `{}` ⇒ any time. Members reference a
+    group via `Member.access_group_id`; the recognition rules enforce door
+    membership + schedule.
+
 ### Settings / branding (white-label)
 - `GET /api/settings` → `{ branding:{…}, attendance:{…} }`
 - `PUT /api/settings` → update (admin only)

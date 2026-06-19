@@ -29,6 +29,7 @@ from . import __version__
 from .core import db, media
 from .core.config import get_settings
 from .routers import (
+    access_groups,
     attendance,
     auth,
     cameras,
@@ -127,6 +128,7 @@ def create_app() -> FastAPI:
     app.include_router(stats.router)
     app.include_router(doors.router)
     app.include_router(cameras.router)
+    app.include_router(access_groups.router)
     app.include_router(settings_router.router)
 
     # Static media (snapshots). Created at startup; mounting a missing dir would

@@ -13,6 +13,7 @@
 import type {
   AccessDecision,
   AccessEvent,
+  AccessGroup,
   AttendanceDay,
   Branding,
   Camera,
@@ -22,6 +23,21 @@ import type {
   TodayStats,
 } from "./types";
 import { todayISO } from "./utils";
+
+/**
+ * Stable id generator for newly-created mock rows. Uses crypto.randomUUID when
+ * available, falling back to a counter-based pseudo-UUID so the demo also works
+ * in older runtimes / SSR.
+ */
+let idCounter = 900_000;
+export function mockId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  idCounter += 1;
+  const hex = idCounter.toString(16).padStart(12, "0");
+  return `00000000-0000-4000-8000-${hex.slice(-12)}`;
+}
 
 // --------------------------------------------------------------------------
 // Seed people — a believable mixed-tenant building (offices + a bank branch).
@@ -62,11 +78,12 @@ const SEED_PEOPLE: Seed[] = [
 ];
 
 function uuid(seed: number): string {
-  // Stable pseudo-UUID per index — good enough for a mock, never collides.
-  const hex = (n: number, len: number) => n.toString(16).padStart(len, "0").slice(0, len);
-  const a = hex(seed * 2654435761, 8);
-  const b = hex(seed * 40503, 4);
-  return `00000000-${b}-4000-8000-${a}0000`;
+  // Deterministic, collision-free pseudo-UUID per seed: the seed is embedded
+  // directly, so distinct seeds always yield distinct ids. (Mock data only.)
+  // The previous version multiplied + sliced high hex digits, which made
+  // seed and 16*seed collide (e.g. uuid(1) === uuid(16)).
+  const s = (seed >>> 0).toString(16).padStart(8, "0");
+  return `${s}-0000-4000-8000-${s}0000`;
 }
 
 const NOW = Date.now();
@@ -376,8 +393,51 @@ export function putMockSettings(next: Settings): Settings {
   return getMockSettings();
 }
 
-// In-memory members list so enrollment in the demo appends a row.
-let liveMembers: Member[] = [...MOCK_MEMBERS];
+// --------------------------------------------------------------------------
+// Access groups — minimal demo set so the member edit form's selector works.
+// (schema.sql defines the table; the Console only needs id + name here.)
+// --------------------------------------------------------------------------
+export const MOCK_ACCESS_GROUPS: AccessGroup[] = [
+  { id: uuid(301), name: "Accès complet", door_ids: [], created_at: iso(-1000 * 60 * 60 * 24 * 120) },
+  {
+    id: uuid(302),
+    name: "Employés — Bureaux",
+    door_ids: [MOCK_DOORS[0].id, MOCK_DOORS[1].id],
+    created_at: iso(-1000 * 60 * 60 * 24 * 110),
+  },
+  {
+    id: uuid(303),
+    name: "Direction & Coffres",
+    door_ids: [MOCK_DOORS[0].id, MOCK_DOORS[2].id],
+    created_at: iso(-1000 * 60 * 60 * 24 * 90),
+  },
+  {
+    id: uuid(304),
+    name: "Prestataires — Heures ouvrées",
+    door_ids: [MOCK_DOORS[0].id],
+    created_at: iso(-1000 * 60 * 60 * 24 * 60),
+  },
+];
+
+let liveAccessGroups: AccessGroup[] = [...MOCK_ACCESS_GROUPS];
+
+export function getMockAccessGroups(): AccessGroup[] {
+  return [...liveAccessGroups];
+}
+
+// --------------------------------------------------------------------------
+// In-memory MEMBERS — create / read / update / delete so the demo mutates.
+// --------------------------------------------------------------------------
+let liveMembers: Member[] = MOCK_MEMBERS.map((m, i) => ({
+  ...m,
+  // Sprinkle a few access-group assignments so the edit form shows real values.
+  access_group_id:
+    m.member_type === "contractor"
+      ? MOCK_ACCESS_GROUPS[3].id
+      : i % 3 === 0
+        ? MOCK_ACCESS_GROUPS[1].id
+        : undefined,
+}));
 
 export function getMockMembers(): Member[] {
   return [...liveMembers];
@@ -386,4 +446,70 @@ export function getMockMembers(): Member[] {
 export function addMockMember(m: Member): Member {
   liveMembers = [m, ...liveMembers];
   return m;
+}
+
+export function updateMockMember(id: string, patch: Partial<Member>): Member {
+  const idx = liveMembers.findIndex((m) => m.id === id);
+  if (idx === -1) throw new Error("Member not found");
+  const next = { ...liveMembers[idx], ...patch, id };
+  liveMembers = liveMembers.map((m) => (m.id === id ? next : m));
+  return next;
+}
+
+export function deleteMockMember(id: string): void {
+  liveMembers = liveMembers.filter((m) => m.id !== id);
+}
+
+// --------------------------------------------------------------------------
+// In-memory DOORS — create / read / update / delete.
+// --------------------------------------------------------------------------
+let liveDoors: Door[] = [...MOCK_DOORS];
+
+export function getMockDoors(): Door[] {
+  return [...liveDoors];
+}
+
+export function addMockDoor(door: Door): Door {
+  liveDoors = [...liveDoors, door];
+  return door;
+}
+
+export function updateMockDoor(id: string, patch: Partial<Door>): Door {
+  const idx = liveDoors.findIndex((d) => d.id === id);
+  if (idx === -1) throw new Error("Door not found");
+  const next = { ...liveDoors[idx], ...patch, id };
+  liveDoors = liveDoors.map((d) => (d.id === id ? next : d));
+  return next;
+}
+
+export function deleteMockDoor(id: string): void {
+  liveDoors = liveDoors.filter((d) => d.id !== id);
+  // Cameras cascade on the door (schema: ON DELETE CASCADE).
+  liveCameras = liveCameras.filter((c) => c.door_id !== id);
+}
+
+// --------------------------------------------------------------------------
+// In-memory CAMERAS — create / read / update / delete.
+// --------------------------------------------------------------------------
+let liveCameras: Camera[] = [...MOCK_CAMERAS];
+
+export function getMockCameras(): Camera[] {
+  return [...liveCameras];
+}
+
+export function addMockCamera(camera: Camera): Camera {
+  liveCameras = [...liveCameras, camera];
+  return camera;
+}
+
+export function updateMockCamera(id: string, patch: Partial<Camera>): Camera {
+  const idx = liveCameras.findIndex((c) => c.id === id);
+  if (idx === -1) throw new Error("Camera not found");
+  const next = { ...liveCameras[idx], ...patch, id };
+  liveCameras = liveCameras.map((c) => (c.id === id ? next : c));
+  return next;
+}
+
+export function deleteMockCamera(id: string): void {
+  liveCameras = liveCameras.filter((c) => c.id !== id);
 }

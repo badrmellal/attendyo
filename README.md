@@ -16,6 +16,12 @@ Sold once. Owned forever. Runs on your own LAN — no cloud, no subscription, no
 
 `Recognition engine: CompreFace (Apache-2.0)` · `CPU-only` · `Unlimited enrolled faces` · `Morocco Law 09-08 / CNDP-friendly by design`
 
+<br>
+
+<img src="docs/screenshots/gate-idle.png" alt="Liwan Gate — the live camera framed inside a Moroccan arch, 'Regardez la caméra'" width="760">
+
+<sub>The Gate kiosk at rest — a face appears inside the arched threshold; the door opens when Liwan knows them.</sub>
+
 </div>
 
 ---
@@ -71,6 +77,43 @@ must stay inside the country and inside the building.
 > Capability claims describe the software design. Specific compliance *certifications*
 > are **not** claimed; data-residency and on-prem architecture are facts, formal
 > certification is the integrator's/buyer's process. See `docs/SECURITY-COMPLIANCE.md`.
+
+## Screenshots
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/gate-welcome.png" alt="Gate kiosk — access granted, greeting a member by name">
+      <sub><b>Gate — access granted.</b> Recognises the face, greets by name, logs the entry, opens the door.</sub>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/dashboard.png" alt="Console dashboard — today's presence overview">
+      <sub><b>Console — today.</b> Present / late / absent / on-site, hourly arrivals, and a live access feed.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td valign="top">
+      <img src="docs/screenshots/attendance.png" alt="Daily attendance — first-in, last-out, hours, status per person">
+      <sub><b>Daily attendance.</b> First-in / last-out / hours / status, per person, per day — with CSV export.</sub>
+    </td>
+    <td valign="top">
+      <img src="docs/screenshots/people.png" alt="People — enrolment and member management">
+      <sub><b>People.</b> Enrol from <b>one photo</b>; edit, suspend, or remove a member.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td valign="top">
+      <img src="docs/screenshots/doors.png" alt="Doors and cameras — drivers, thresholds, test-open">
+      <sub><b>Doors &amp; cameras.</b> Per-door driver (webhook · Pi GPIO · simulation), relock, thresholds, test-open.</sub>
+    </td>
+    <td valign="top">
+      <img src="docs/screenshots/monitor.png" alt="Live access monitor wall">
+      <sub><b>Live monitor.</b> A wall view of access decisions as they happen — granted, refused, off-hours.</sub>
+    </td>
+  </tr>
+</table>
+
+<sub>Shown in demo/mock data. The name, colours, logo, and language are <b>white-label</b> — set per deployment from <code>GET /api/settings → branding</code>, not baked into the build.</sub>
 
 ## Architecture at a glance
 

@@ -111,6 +111,38 @@ export type Camera = {
   created_at: string;
 };
 
+/**
+ * Access group — which doors a member may open (liwan/db/schema.sql).
+ * The Console only needs id + name to populate the member access-group select.
+ */
+export type AccessGroup = {
+  id: string;
+  name: string;
+  door_ids?: string[];
+  created_at?: string;
+};
+
+/** Fields posted to `POST /api/doors` (and patched via PATCH). */
+export type DoorDraft = {
+  name: string;
+  location?: string;
+  direction: DoorDirection;
+  driver: DoorDriver;
+  driver_config: Record<string, unknown>;
+  relock_seconds: number;
+  enabled: boolean;
+};
+
+/** Fields posted to `POST /api/cameras` (and patched via PATCH). */
+export type CameraDraft = {
+  name: string;
+  door_id?: string;
+  source?: string;
+  recognition_threshold: number;
+  det_prob_threshold: number;
+  enabled: boolean;
+};
+
 /** Branding tokens — `GET /api/settings → branding`. White-label surface. */
 export type Locale = "fr" | "en" | "ar";
 
