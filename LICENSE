@@ -1,0 +1,188 @@
+LIWAN — END-USER LICENSE AGREEMENT (PERPETUAL, ON-PREMISE)
+============================================================
+
+>>> TEMPLATE — NOT LEGAL ADVICE <<<
+This End-User License Agreement ("EULA") is a TEMPLATE provided as a starting
+point only. It has NOT been reviewed for any specific jurisdiction. Before using
+it in a real sale, HAVE IT REVIEWED AND ADAPTED BY QUALIFIED LEGAL COUNSEL,
+including for conformity with Moroccan law (notably Law No. 09-08 on the
+protection of individuals with regard to the processing of personal data and the
+requirements of the CNDP), and any other law applicable to the Licensee and the
+deployment. Bracketed fields [LIKE THIS] must be completed. The Licensor and the
+authors disclaim any liability arising from use of this template as-is.
+
+This EULA governs the LIWAN application software ("Software") authored and
+licensed by [LICENSOR LEGAL NAME], [ADDRESS], [COMMERCIAL REGISTER / ICE]
+("Licensor"). It does NOT govern third-party components bundled with the
+Software, which are licensed separately — see the NOTICE file (in particular the
+CompreFace recognition engine, © Exadel Inc., Apache License 2.0).
+
+By installing, copying, or using the Software, the entity identified in the
+applicable order or quotation ("Licensee") agrees to this EULA.
+
+------------------------------------------------------------------------------
+1. DEFINITIONS
+------------------------------------------------------------------------------
+1.1 "Software" means the LIWAN application code authored by the Licensor — the
+    API service, the Console and Gate web applications, the Bridge worker,
+    scripts, configuration, and documentation — EXCLUDING third-party components
+    listed in the NOTICE file.
+1.2 "Site" means one physical location and the single server installation of the
+    Software serving it, as identified in the order.
+1.3 "License Tier" means the enrolled-person band purchased (e.g. Starter,
+    Business, Pro, Enterprise), as stated in the order.
+1.4 "Order" means the quotation, purchase order, or contract referencing this
+    EULA and stating the Site(s), License Tier, fees, and any support plan.
+1.5 "Documentation" means the files under docs/ and the README provided with the
+    Software.
+
+------------------------------------------------------------------------------
+2. LICENSE GRANT (PERPETUAL, ON-PREMISE)
+------------------------------------------------------------------------------
+2.1 Subject to payment of the one-time license fee in the Order and to this
+    EULA, the Licensor grants the Licensee a PERPETUAL, NON-EXCLUSIVE,
+    NON-TRANSFERABLE (except per Section 9) license to install and use the
+    Software on the Licensee's own infrastructure, ON-PREMISE, for the Site(s)
+    and within the License Tier stated in the Order.
+2.2 The license is PERPETUAL: once granted and paid, it does not expire and does
+    not require a subscription. The Software contains no time-bomb or
+    license-server call-home that would disable it.
+2.3 The Licensee may make a reasonable number of copies of the Software for
+    backup, testing, and disaster recovery for the licensed Site(s).
+2.4 The Licensee may configure white-label branding of the Software for its own
+    internal deployment. Resale or sublicensing of the Software as a product is
+    permitted ONLY to a party authorized in writing by the Licensor as a
+    reseller/integrator and bound by terms no less protective than this EULA.
+
+------------------------------------------------------------------------------
+3. SCOPE & TIER
+------------------------------------------------------------------------------
+3.1 Use is limited to the purchased License Tier and Site(s). Exceeding the Tier
+    (e.g. materially more enrolled persons than purchased) or deploying to
+    additional Sites requires an upgrade order and additional fees.
+3.2 The number of doors, cameras, and operators within a licensed Site is not
+    separately metered, subject to Section 3.1.
+
+------------------------------------------------------------------------------
+4. RESTRICTIONS
+------------------------------------------------------------------------------
+The Licensee shall not, except to the extent expressly permitted by this EULA or
+by applicable law that cannot be excluded by agreement:
+  (a) sell, rent, lease, sublicense, or distribute the Software as a standalone
+      product to third parties (other than an authorized reseller per 2.4);
+  (b) remove, alter, or obscure the NOTICE file or any third-party attribution
+      or copyright notices;
+  (c) use the Software to provide a hosted/SaaS service to unrelated third
+      parties without the Licensor's written authorization;
+  (d) reverse engineer the Software except to the extent such restriction is
+      prohibited by applicable law (and noting that any open-source components
+      remain governed by their own licenses, which may expressly permit this).
+
+------------------------------------------------------------------------------
+5. THIRD-PARTY & OPEN-SOURCE COMPONENTS
+------------------------------------------------------------------------------
+5.1 The Software is distributed together with third-party components, including
+    the CompreFace face recognition engine (© Exadel Inc., Apache License 2.0).
+    Those components are licensed to the Licensee under their OWN licenses, NOT
+    under this EULA. See the NOTICE file.
+5.2 Nothing in this EULA limits the Licensee's rights, or adds obligations,
+    under those third-party licenses. In case of conflict regarding a
+    third-party component, that component's license governs that component.
+
+------------------------------------------------------------------------------
+6. DATA, PRIVACY & COMPLIANCE (IMPORTANT)
+------------------------------------------------------------------------------
+6.1 The Software runs ON-PREMISE and does not transmit personal or biometric
+    data to the Licensor or any third party in the course of normal operation.
+    The Licensee is and remains the DATA CONTROLLER for all personal and
+    biometric data it processes using the Software.
+6.2 The Licensee is solely responsible for the lawful use of the Software,
+    INCLUDING obtaining any required CNDP authorization under Law 09-08,
+    establishing a lawful basis, providing notices to data subjects, honoring
+    data-subject rights, and setting and enforcing retention — and, where
+    applicable, GDPR obligations. See docs/SECURITY-COMPLIANCE.md.
+6.3 The Licensor does not, by providing the Software, become a data processor or
+    controller of the Licensee's data, and makes NO representation that any
+    specific deployment is compliant or authorized. Compliance is the Licensee's
+    responsibility.
+
+------------------------------------------------------------------------------
+7. SUPPORT & UPDATES
+------------------------------------------------------------------------------
+7.1 The perpetual license does NOT include support or updates unless a support
+    plan is purchased in the Order. The Software remains usable without support.
+7.2 If a support plan is purchased, its scope, response targets, and annual fee
+    are as stated in the Order. Updates provided under a support plan are
+    licensed under this EULA.
+
+------------------------------------------------------------------------------
+8. WARRANTY & DISCLAIMER
+------------------------------------------------------------------------------
+8.1 Limited warranty (if any) is as stated in the Order. EXCEPT AS EXPRESSLY
+    STATED THERE, THE SOFTWARE IS PROVIDED "AS IS" AND "AS AVAILABLE", WITHOUT
+    WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING WARRANTIES OF
+    MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.
+8.2 The Licensor does not warrant that face recognition is error-free.
+    Recognition is probabilistic and may produce false accepts/rejects varying
+    with environment, hardware, and population. The Licensee is responsible for
+    appropriate thresholds and fallback procedures, especially for high-stakes
+    access points.
+8.3 The Software is not certified for, and must not be solely relied upon for,
+    life-safety or fire-egress functions. Free egress and fire-code compliance
+    must be ensured by independent hardware/controls (see docs/DOOR-INTEGRATION.md).
+
+------------------------------------------------------------------------------
+9. ASSIGNMENT
+------------------------------------------------------------------------------
+The Licensee may not assign this EULA or the license without the Licensor's prior
+written consent, except to a successor of substantially all of its business that
+agrees in writing to be bound by this EULA.
+
+------------------------------------------------------------------------------
+10. LIMITATION OF LIABILITY
+------------------------------------------------------------------------------
+10.1 TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, THE LICENSOR SHALL NOT BE
+     LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE
+     DAMAGES, OR FOR LOSS OF PROFITS, DATA, OR GOODWILL.
+10.2 THE LICENSOR'S TOTAL AGGREGATE LIABILITY UNDER THIS EULA SHALL NOT EXCEED
+     THE AMOUNT OF THE ONE-TIME LICENSE FEE ACTUALLY PAID BY THE LICENSEE FOR THE
+     AFFECTED SITE.
+10.3 Nothing in this EULA excludes or limits liability that cannot be excluded or
+     limited under applicable law.
+
+------------------------------------------------------------------------------
+11. TERM & TERMINATION
+------------------------------------------------------------------------------
+11.1 This EULA is effective on first use and, as to the license grant, is
+     PERPETUAL.
+11.2 The Licensor may terminate the license if the Licensee materially breaches
+     this EULA (including non-payment of the license fee or use beyond the Tier)
+     and fails to cure within thirty (30) days of written notice. On termination
+     for such breach, the Licensee shall cease use and destroy copies of the
+     Software, EXCEPT that the Licensee's lawful possession of, and obligations
+     regarding, personal data it controls are governed by data-protection law,
+     not by this EULA.
+
+------------------------------------------------------------------------------
+12. GOVERNING LAW & DISPUTES
+------------------------------------------------------------------------------
+12.1 This EULA is governed by the laws of [JURISDICTION — e.g. the Kingdom of
+     Morocco], without regard to conflict-of-laws rules.
+12.2 The courts of [VENUE — e.g. Casablanca, Morocco] shall have jurisdiction,
+     unless the Order specifies arbitration.
+
+------------------------------------------------------------------------------
+13. ENTIRE AGREEMENT
+------------------------------------------------------------------------------
+This EULA together with the applicable Order is the entire agreement between the
+parties regarding the Software and supersedes prior proposals and communications
+on its subject matter. If any provision is held unenforceable, the remainder
+stays in effect.
+
+Copyright (c) [YEAR] [LICENSOR LEGAL NAME]. All rights reserved.
+"Liwan", "لِيوان", and the Liwan marks are trademarks of [LICENSOR LEGAL NAME]
+where applicable. Other names and marks (e.g. CompreFace, Exadel, ZKTeco,
+Hikvision, Matrix) belong to their respective owners and are used for
+identification and comparison only.
+
+>>> REMINDER: This is a TEMPLATE. Do not use in a sale without review by counsel. <<<

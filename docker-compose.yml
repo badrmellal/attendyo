@@ -1,0 +1,152 @@
+# ===========================================================================
+# LIWAN — Face Attendance & Access Control
+# Full on-prem stack: CompreFace engine + Liwan app. Runs on a single CPU box.
+#   docker compose up -d
+# Ports:
+#   8000  CompreFace admin UI (enrolment fallback / engine config)
+#   8088  Liwan API (FastAPI)
+#   3000  Liwan Console (admin dashboard)
+#   3001  Liwan Gate (door kiosk)
+# ===========================================================================
+
+volumes:
+  liwan-postgres-data:
+  liwan-media:
+
+networks:
+  liwan:
+
+services:
+  # ---- CompreFace engine (recognition core) --------------------------------
+  liwan-postgres-db:
+    image: ${registry}compreface-postgres-db:${POSTGRES_VERSION}
+    container_name: liwan-postgres-db
+    restart: always
+    environment:
+      - POSTGRES_USER=${postgres_username}
+      - POSTGRES_PASSWORD=${postgres_password}
+      - POSTGRES_DB=${postgres_db}
+    volumes:
+      - liwan-postgres-data:/var/lib/postgresql/data
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/10-liwan-schema.sql:ro
+    networks: [liwan]
+
+  liwan-compreface-admin:
+    image: ${registry}compreface-admin:${ADMIN_VERSION}
+    container_name: liwan-compreface-admin
+    restart: always
+    depends_on: [liwan-postgres-db, liwan-compreface-api]
+    environment:
+      - POSTGRES_USER=${postgres_username}
+      - POSTGRES_PASSWORD=${postgres_password}
+      - POSTGRES_URL=jdbc:postgresql://${postgres_domain}:${postgres_port}/${postgres_db}
+      - SPRING_PROFILES_ACTIVE=dev
+      - ENABLE_EMAIL_SERVER=${enable_email_server}
+      - ADMIN_JAVA_OPTS=${compreface_admin_java_options}
+      - MAX_FILE_SIZE=${max_file_size}
+      - MAX_REQUEST_SIZE=${max_request_size}B
+    networks: [liwan]
+
+  liwan-compreface-api:
+    image: ${registry}compreface-api:${API_VERSION}
+    container_name: liwan-compreface-api
+    restart: always
+    depends_on: [liwan-postgres-db]
+    environment:
+      - POSTGRES_USER=${postgres_username}
+      - POSTGRES_PASSWORD=${postgres_password}
+      - POSTGRES_URL=jdbc:postgresql://${postgres_domain}:${postgres_port}/${postgres_db}
+      - SPRING_PROFILES_ACTIVE=dev
+      - API_JAVA_OPTS=${compreface_api_java_options}
+      - SAVE_IMAGES_TO_DB=${save_images_to_db}
+      - MAX_FILE_SIZE=${max_file_size}
+      - MAX_REQUEST_SIZE=${max_request_size}B
+      - CONNECTION_TIMEOUT=${connection_timeout:-10000}
+      - READ_TIMEOUT=${read_timeout:-60000}
+    networks: [liwan]
+
+  liwan-compreface-core:
+    image: ${registry}compreface-core:${CORE_VERSION}
+    container_name: liwan-compreface-core
+    restart: always
+    environment:
+      - ML_PORT=3000
+      - IMG_LENGTH_LIMIT=${max_detect_size}
+      - UWSGI_PROCESSES=${uwsgi_processes:-2}
+      - UWSGI_THREADS=${uwsgi_threads:-2}
+      - PYTHONUNBUFFERED=1
+    networks: [liwan]
+
+  liwan-compreface-fe:
+    image: ${registry}compreface-fe:${FE_VERSION}
+    container_name: liwan-compreface-fe
+    restart: always
+    depends_on: [liwan-compreface-api, liwan-compreface-admin]
+    ports:
+      - "8000:80"
+    environment:
+      - CLIENT_MAX_BODY_SIZE=${max_request_size}
+      - PROXY_READ_TIMEOUT=${read_timeout:-60000}ms
+      - PROXY_CONNECT_TIMEOUT=${connection_timeout:-10000}ms
+    networks: [liwan]
+
+  # ---- Liwan application layer --------------------------------------------
+  liwan-api:
+    build: ./services/api
+    container_name: liwan-api
+    restart: unless-stopped
+    depends_on: [liwan-postgres-db, liwan-compreface-api]
+    environment:
+      - DB_HOST=${postgres_domain}
+      - DB_PORT=${postgres_port}
+      - DB_NAME=${postgres_db}
+      - DB_USER=${postgres_username}
+      - DB_PASSWORD=${postgres_password}
+      - COMPREFACE_API_URL=${COMPREFACE_API_URL}
+      - COMPREFACE_API_KEY=${COMPREFACE_API_KEY}
+      - LIWAN_JWT_SECRET=${LIWAN_JWT_SECRET}
+      - LIWAN_ADMIN_EMAIL=${LIWAN_ADMIN_EMAIL}
+      - LIWAN_ADMIN_PASSWORD=${LIWAN_ADMIN_PASSWORD}
+      - LIWAN_DEVICE_KEY=${LIWAN_DEVICE_KEY}
+    volumes:
+      - liwan-media:/data/media
+    ports:
+      - "8088:8088"
+    networks: [liwan]
+
+  liwan-console:
+    build:
+      context: ./apps/console
+      args:
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+    container_name: liwan-console
+    restart: unless-stopped
+    depends_on: [liwan-api]
+    ports:
+      - "3000:3000"
+    networks: [liwan]
+
+  liwan-gate:
+    build:
+      context: ./apps/gate
+      args:
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+    container_name: liwan-gate
+    restart: unless-stopped
+    depends_on: [liwan-api]
+    ports:
+      - "3001:3000"
+    networks: [liwan]
+
+  # ---- Bridge: camera → recognition → door (optional; for fixed RTSP cams) -
+  # Enable with: docker compose --profile cameras up -d
+  liwan-bridge:
+    build: ./services/bridge
+    container_name: liwan-bridge
+    restart: unless-stopped
+    profiles: ["cameras"]
+    depends_on: [liwan-api]
+    environment:
+      - LIWAN_API_URL=http://liwan-api:8088
+      - LIWAN_DEVICE_KEY=${LIWAN_DEVICE_KEY}
+    networks: [liwan]

@@ -1,0 +1,217 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ===========================================================================
+   Liwan Console — brand tokens.
+   Colors from brand/BRAND.md. Stored as "R G B" triplets so Tailwind opacity
+   modifiers work (rgb(var(--token) / <alpha-value>)). --primary and --accent
+   are overwritten at runtime from GET /api/settings → branding.
+   Dark is the default (this is a security product).
+   =========================================================================== */
+
+:root,
+[data-theme="dark"] {
+  --bg: 12 10 18; /* #0C0A12  violet-ink field */
+  --surface: 21 18 30; /* #15121E */
+  --surface-2: 30 26 42; /* #1E1A2A */
+  --border: 44 39 64; /* #2C2740 */
+  --text: 236 231 244; /* #ECE7F4 */
+  --text-muted: 154 147 174; /* #9A93AE */
+  --primary: 86 99 242; /* #5663F2  ultramarine / Majorelle — brand + "granted/present" */
+  --primary-2: 124 92 255; /* #7C5CFF  violet — gradient / arch sweep */
+  --accent: 224 163 64; /* #E0A340  sand / ochre gold — "late" + premium + arch trace */
+  --danger: 242 85 119; /* #F25577  rose-red — "denied/absent" */
+  --info: 139 123 255; /* #8B7BFF  lilac — neutral secondary */
+  --shadow-strength: 0.55;
+  color-scheme: dark;
+}
+
+[data-theme="light"] {
+  --bg: 246 244 251; /* #F6F4FB */
+  --surface: 255 255 255;
+  --surface-2: 239 234 248; /* #EFEAF8 */
+  --border: 226 220 239; /* #E2DCEF */
+  --text: 22 18 31; /* #16121F */
+  --text-muted: 107 100 128; /* #6B6480 */
+  --primary: 75 84 224; /* #4B54E0 deeper ultramarine for light contrast */
+  --primary-2: 124 92 255; /* #7C5CFF */
+  --accent: 181 131 43; /* #B5832B deeper gold on light */
+  --danger: 214 67 95; /* #D6435F */
+  --info: 111 92 240; /* #6F5CF0 */
+  --shadow-strength: 0.12;
+  color-scheme: light;
+}
+
+* {
+  border-color: rgb(var(--border));
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background-color: rgb(var(--bg));
+  color: rgb(var(--text));
+  font-feature-settings: "cv11", "ss01";
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;
+}
+
+/* Tabular numerals everywhere numbers carry meaning. */
+.tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* Ambient app background — a soft ultramarine aura top-left + gold top-right,
+   over the violet-ink field. */
+.app-aura {
+  background:
+    radial-gradient(
+      1100px 600px at 8% -8%,
+      rgb(var(--primary) / 0.10),
+      transparent 60%
+    ),
+    radial-gradient(
+      900px 500px at 100% 0%,
+      rgb(var(--accent) / 0.07),
+      transparent 55%
+    );
+}
+
+/* Hairline card with subtle inner glow. */
+.card {
+  background-color: rgb(var(--surface));
+  border: 1px solid rgb(var(--border) / 0.8);
+  border-radius: 16px;
+  box-shadow:
+    0 1px 0 0 rgb(255 255 255 / 0.02) inset,
+    0 12px 40px -20px rgb(0 0 0 / var(--shadow-strength));
+}
+
+.card-quiet {
+  background-color: rgb(var(--surface) / 0.6);
+  border: 1px solid rgb(var(--border) / 0.6);
+  border-radius: 14px;
+}
+
+/* Thin scrollbars that match the surface. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--border)) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgb(var(--border));
+  border-radius: 999px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--text-muted) / 0.5);
+}
+
+/* Focus ring — quiet, ultramarine, never jarring. */
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid rgb(var(--primary) / 0.7);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+/* Inputs */
+.field {
+  background-color: rgb(var(--surface-2) / 0.6);
+  border: 1px solid rgb(var(--border));
+  border-radius: 10px;
+  color: rgb(var(--text));
+  transition: border-color 0.18s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.18s cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.field::placeholder {
+  color: rgb(var(--text-muted) / 0.7);
+}
+.field:focus {
+  border-color: rgb(var(--primary) / 0.6);
+  box-shadow: 0 0 0 3px rgb(var(--primary) / 0.12);
+  outline: none;
+}
+
+/* Primary button */
+.btn-primary {
+  background-color: rgb(var(--primary));
+  color: #FBFAFF;
+  border-radius: 10px;
+  font-weight: 600;
+  transition: transform 0.15s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.18s cubic-bezier(0.22, 1, 0.36, 1),
+    filter 0.18s ease;
+  box-shadow: 0 8px 24px -10px rgb(var(--primary) / 0.6);
+}
+.btn-primary:hover {
+  filter: brightness(1.06);
+  box-shadow: 0 10px 30px -10px rgb(var(--primary) / 0.7);
+}
+.btn-primary:active {
+  transform: translateY(1px);
+}
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* Ghost / secondary button */
+.btn-ghost {
+  background-color: rgb(var(--surface-2) / 0.5);
+  border: 1px solid rgb(var(--border));
+  color: rgb(var(--text));
+  border-radius: 10px;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+.btn-ghost:hover {
+  background-color: rgb(var(--surface-2));
+  border-color: rgb(var(--text-muted) / 0.4);
+}
+
+/* Skeleton shimmer */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background-color: rgb(var(--surface-2) / 0.6);
+  border-radius: 8px;
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgb(var(--text) / 0.05),
+    transparent
+  );
+  animation: shimmer 1.6s infinite;
+}
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* Reduced motion: respect the user. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

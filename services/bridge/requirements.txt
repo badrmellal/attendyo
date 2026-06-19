@@ -1,0 +1,17 @@
+# LIWAN Bridge — headless camera worker dependencies.
+# On-prem, CPU-only, no cloud SDKs. Pinned to conservative, widely-available
+# versions so an offline `pip download` mirror can serve them on a bank LAN.
+
+# Frame capture + lightweight motion/face gating. Headless build: no GUI/X11
+# dependencies, smaller image, no libGL requirements beyond OpenCV's own.
+opencv-python-headless==4.10.0.84
+
+# NumPy: OpenCV frames are ndarrays and bridge.py uses it directly. It is a
+# transitive dep of OpenCV, but pin it explicitly so nothing is implicit.
+numpy==1.26.4
+
+# HTTP client for the Liwan API (login, /api/cameras, /api/recognize).
+requests==2.32.3
+
+# Load configuration from a .env file when not injected by the container env.
+python-dotenv==1.0.1
