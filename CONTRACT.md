@@ -31,9 +31,11 @@ a module needs a change, update this file first.
 ```ts
 type Member = {
   id: string; external_id?: string; full_name: string; subject_name?: string;
-  member_type: "employee"|"resident"|"contractor"|"visitor";
+  member_type: "employee"|"resident"|"contractor"|"visitor"|"student"|"faculty"|"staff";
   department?: string; title?: string; email?: string; phone?: string;
   access_group_id?: string; photo_url?: string;
+  valid_from?: string;   // ISO date; temporary-access window start (visitors/contractors/exchange)
+  valid_until?: string;  // ISO date; outside the window → not_authorized, reason "expired"
   status: "active"|"suspended"|"archived"; created_at: string;
 };
 
@@ -110,6 +112,76 @@ type RecognizeResult = {
 ### Settings / branding (white-label)
 - `GET /api/settings` → `{ branding:{…}, attendance:{…} }`
 - `PUT /api/settings` → update (admin only)
+- `branding.terminology: "workforce" | "campus" | "residence"` — relabels the UI:
+  - workforce: Personnes/Employés · Département · "Présence"
+  - campus:    Étudiants & Personnel · Faculté / École · types student/faculty/staff surfaced first
+  - residence: Résidents · Immeuble / Bâtiment · types resident/visitor first
+  Labels live in the Console/Gate i18n layer keyed by preset; the API stores the preset only.
+
+## v2 endpoints
+
+### Reports & analytics (operator+)
+- `GET /api/reports/summary?from&to` → `{ days:int, avg_present:number, avg_late:number,
+   avg_absent:number, punctuality_rate:number, avg_worked_seconds:number,
+   daily: { date:string, present:int, late:int, absent:int }[] }`
+- `GET /api/reports/departments?from&to` → `{ department:string, members:int, present_days:int,
+   late_days:int, absent_days:int, avg_worked_seconds:number }[]`
+- `GET /api/reports/members?from&to&sort=late|hours|absences&limit` → `{ member_id, member_name,
+   department, present_days, late_days, absent_days, avg_arrival:string|null,
+   total_worked_seconds:number }[]`
+- `GET /api/reports/export.csv?from&to` → per-member aggregate CSV (accepts `?token=`)
+
+### Presence / muster (operator+)
+- `GET /api/presence/now` → `{ count:int, people: { member_id, member_name, department,
+   member_type, first_in_ts, first_in_door_name }[] }`
+  — members whose today row has `first_in_ts` set and no later `last_out_ts`.
+  Console renders this as the live on-site list + a print-ready evacuation (muster) view.
+
+### Alerts (operator+ to ack; created automatically)
+- Recognition path: every non-granted decision INSERTs an `alerts` row
+  (kind = the decision, message localized-neutral, links event/door/member) and publishes
+  SSE `event: alert` with the Alert JSON.
+- `GET /api/alerts?acknowledged=&kind=&limit=` → `Alert[]`
+- `GET /api/alerts/count` → `{ unacknowledged:int }` (badge)
+- `POST /api/alerts/{id}/ack` → `Alert` (sets acknowledged_by/at from the JWT)
+- `POST /api/alerts/ack-all` → `{ acknowledged:int }`
+```ts
+type Alert = { id:number; ts:string; kind:"unknown_face"|"not_authorized"|"off_schedule"|"system";
+  severity:"info"|"warning"|"critical"; message:string; event_id?:number; door_id?:string;
+  door_name?:string; member_id?:string; member_name?:string; acknowledged:boolean;
+  acknowledged_by_email?:string; acknowledged_at?:string };
+```
+
+### Audit log (admin only; append-only)
+- The API records: `login`, `member.create|update|delete|import`, `door.create|update|delete|open`,
+  `camera.create|update|delete`, `access_group.create|update|delete`, `settings.update`,
+  `user.create|update|delete`, `alerts.ack`. Actor comes from the JWT.
+- `GET /api/audit?limit=&action=&user=` → `{ id, ts, user_email, action, entity, entity_id,
+   details }[]`
+
+### Team / operator users (admin only)
+- `GET /api/users` → `{ id, email, full_name, role, created_at }[]` (no hashes)
+- `POST /api/users` `{ email, full_name?, role, password }` → user
+- `PATCH /api/users/{id}` `{ full_name?, role?, password? }` → user
+- `DELETE /api/users/{id}` → 204. Refuse deleting yourself and the last admin (409).
+
+### Bulk import (operator+)
+- `POST /api/members/import` (multipart `file`: CSV with header
+  `full_name,external_id,member_type,department,title,email,phone,valid_from,valid_until`)
+  → `{ created:int, skipped:int, errors: { line:int, message:string }[] }`
+  Creates members WITHOUT photos (enrol face later); skips rows whose
+  `external_id` already exists.
+
+### Decision rules v2 (adds to the v1 ladder)
+3b. Member has a validity window and today is outside `[valid_from, valid_until]`
+    → `not_authorized`, reason `"expired"` (or `"not_yet_valid"`).
+
+### Engine naming (white-label)
+The recognition core is referred to as the **Liwan Vision Engine** in every
+customer-facing surface (docs, sales, UI, compose service names, env vars).
+Env vars: `ENGINE_URL` / `ENGINE_API_KEY` (the API also accepts the legacy
+`COMPREFACE_API_URL` / `COMPREFACE_API_KEY` as fallbacks). Third-party attribution
+lives ONLY in `NOTICE` / the licence section, as Apache-2.0 requires.
 
 ### Health
 - `GET /health` → `{ status:"ok", compreface:"ok"|"down", db:"ok"|"down" }`

@@ -1,9 +1,9 @@
 -- ===========================================================================
 -- LIWAN — Face Attendance & Access Control
 -- Application schema. Lives in its own `liwan` schema inside the same Postgres
--- instance used by the CompreFace engine, so the two never collide.
+-- instance used by the Liwan Vision Engine, so the two never collide.
 --
--- The CompreFace engine owns the `public` schema (subjects, embeddings, images).
+-- The vision engine owns the `public` schema (subjects, embeddings, images).
 -- Liwan owns everything below: people, doors, daily attendance, access events.
 -- ===========================================================================
 
@@ -73,21 +73,26 @@ CREATE TABLE IF NOT EXISTS access_groups (
 
 -- ---------------------------------------------------------------------------
 -- Members — the enrolled people. Generic on purpose: works for employees,
--- residents, contractors, visitors. subject_name links to a CompreFace subject.
+-- residents, contractors, visitors. subject_name links to an engine subject.
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS members (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    external_id     TEXT,                         -- badge no / apt no / staff id
+    external_id     TEXT,                         -- badge no / apt no / staff id / student no
     full_name       TEXT NOT NULL,
-    subject_name    TEXT UNIQUE,                  -- CompreFace subject id
+    subject_name    TEXT UNIQUE,                  -- engine subject id
     member_type     TEXT NOT NULL DEFAULT 'employee'
-                        CHECK (member_type IN ('employee','resident','contractor','visitor')),
-    department      TEXT,
+                        CHECK (member_type IN ('employee','resident','contractor','visitor',
+                                               'student','faculty','staff')),
+    department      TEXT,                         -- department / faculté / building
     title           TEXT,
     email           TEXT,
     phone           TEXT,
     access_group_id UUID REFERENCES access_groups(id) ON DELETE SET NULL,
     photo_path      TEXT,                         -- stored enrollment image
+    -- Temporary access window (visitors, contractors, exchange students).
+    -- NULL = no bound on that side. Outside the window → not_authorized ("expired").
+    valid_from      DATE,
+    valid_until     DATE,
     status          TEXT NOT NULL DEFAULT 'active'
                         CHECK (status IN ('active','suspended','archived')),
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -149,7 +154,9 @@ CREATE TABLE IF NOT EXISTS settings (
 );
 
 -- ---------------------------------------------------------------------------
--- Users — console operators (separate from members / CompreFace users).
+-- Users — console operators (separate from members / engine users).
+-- admin: everything · operator: day-to-day (enrol, doors, ack alerts)
+-- viewer: read-only dashboards & reports.
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS users (
     id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -162,6 +169,45 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 -- ---------------------------------------------------------------------------
+-- Alerts — persistent, acknowledgeable security notifications. Created by the
+-- recognition path for non-granted decisions (and by the system for faults).
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS alerts (
+    id              BIGSERIAL PRIMARY KEY,
+    ts              TIMESTAMPTZ NOT NULL DEFAULT now(),
+    kind            TEXT NOT NULL
+                        CHECK (kind IN ('unknown_face','not_authorized','off_schedule','system')),
+    severity        TEXT NOT NULL DEFAULT 'warning'
+                        CHECK (severity IN ('info','warning','critical')),
+    message         TEXT NOT NULL,
+    event_id        BIGINT REFERENCES access_events(id) ON DELETE SET NULL,
+    door_id         UUID REFERENCES doors(id) ON DELETE SET NULL,
+    member_id       UUID REFERENCES members(id) ON DELETE SET NULL,
+    acknowledged    BOOLEAN NOT NULL DEFAULT FALSE,
+    acknowledged_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    acknowledged_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_alerts_ts    ON alerts(ts DESC);
+CREATE INDEX IF NOT EXISTS idx_alerts_unack ON alerts(acknowledged) WHERE NOT acknowledged;
+
+-- ---------------------------------------------------------------------------
+-- Audit log — every operator action, for compliance (banks, government,
+-- universities). Append-only; the API writes, nothing updates or deletes.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS audit_log (
+    id         BIGSERIAL PRIMARY KEY,
+    ts         TIMESTAMPTZ NOT NULL DEFAULT now(),
+    user_id    UUID,                -- no FK: audit rows must survive user deletion
+    user_email TEXT,
+    action     TEXT NOT NULL,       -- e.g. login, member.create, door.update, settings.update
+    entity     TEXT,                -- member | door | camera | access_group | settings | user
+    entity_id  TEXT,
+    details    JSONB NOT NULL DEFAULT '{}'
+);
+CREATE INDEX IF NOT EXISTS idx_audit_ts     ON audit_log(ts DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_log(action);
+
+-- ---------------------------------------------------------------------------
 -- Seed defaults (idempotent)
 -- ---------------------------------------------------------------------------
 INSERT INTO settings (key, value) VALUES
@@ -171,7 +217,8 @@ INSERT INTO settings (key, value) VALUES
         "primary_color": "#5663F2",
         "accent_color": "#E0A340",
         "logo_url": null,
-        "locale": "fr"
+        "locale": "fr",
+        "terminology": "workforce"
     }'::jsonb)
 ON CONFLICT (key) DO NOTHING;
 
