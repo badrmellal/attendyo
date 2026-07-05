@@ -22,7 +22,7 @@ For each fixed camera the bridge:
 Cameras run on independent daemon threads; the main thread waits for a stop
 signal and shuts everything down cleanly.
 
-The bridge never decides access itself and never talks to CompreFace or the
+The bridge never decides access itself and never talks to the vision engine or the
 door directly — it is purely an eye that feeds the Liwan API. That keeps the
 decision rules in exactly one place (the API), per CONTRACT.md.
 """
@@ -87,7 +87,7 @@ class FaceGate:
 
     Pure OpenCV, no model downloads, runs comfortably on a CPU. It is a *gate*,
     not a recognizer — its only job is to decide whether a frame is worth a
-    network round-trip. The API/CompreFace make the real call.
+    network round-trip. The API and the vision engine make the real call.
     """
 
     def __init__(self, motion_min_area_frac: float) -> None:

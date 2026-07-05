@@ -8,7 +8,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from starlette.concurrency import run_in_threadpool
 
-from ..core import db, security
+from ..core import audit, db, security
 from ..models.schemas import LoginRequest, TokenResponse, UserOut
 
 logger = logging.getLogger("liwan.auth")
@@ -39,6 +39,9 @@ async def login(payload: LoginRequest) -> TokenResponse:
             headers={"WWW-Authenticate": "Bearer"},
         )
     token = security.create_access_token(str(user["id"]), role=user["role"])
+    await run_in_threadpool(
+        audit.record, user, "login", entity="user", entity_id=str(user["id"]),
+    )
     return TokenResponse(access_token=token, token_type="bearer")
 
 

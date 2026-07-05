@@ -14,8 +14,8 @@ authors disclaim any liability arising from use of this template as-is.
 This EULA governs the LIWAN application software ("Software") authored and
 licensed by [LICENSOR LEGAL NAME], [ADDRESS], [COMMERCIAL REGISTER / ICE]
 ("Licensor"). It does NOT govern third-party components bundled with the
-Software, which are licensed separately — see the NOTICE file (in particular the
-CompreFace recognition engine, © Exadel Inc., Apache License 2.0).
+Software, which are licensed separately — see the NOTICE file for the full list
+of bundled open-source components and their licenses.
 
 By installing, copying, or using the Software, the entity identified in the
 applicable order or quotation ("Licensee") agrees to this EULA.
@@ -81,10 +81,10 @@ by applicable law that cannot be excluded by agreement:
 ------------------------------------------------------------------------------
 5. THIRD-PARTY & OPEN-SOURCE COMPONENTS
 ------------------------------------------------------------------------------
-5.1 The Software is distributed together with third-party components, including
-    the CompreFace face recognition engine (© Exadel Inc., Apache License 2.0).
-    Those components are licensed to the Licensee under their OWN licenses, NOT
-    under this EULA. See the NOTICE file.
+5.1 The Software is distributed together with third-party open-source
+    components, identified with their copyright holders and licenses in the
+    NOTICE file. Those components are licensed to the Licensee under their OWN
+    licenses, NOT under this EULA. See the NOTICE file.
 5.2 Nothing in this EULA limits the Licensee's rights, or adds obligations,
     under those third-party licenses. In case of conflict regarding a
     third-party component, that component's license governs that component.
@@ -181,8 +181,8 @@ stays in effect.
 
 Copyright (c) [YEAR] [LICENSOR LEGAL NAME]. All rights reserved.
 "Liwan", "لِيوان", and the Liwan marks are trademarks of [LICENSOR LEGAL NAME]
-where applicable. Other names and marks (e.g. CompreFace, Exadel, ZKTeco,
-Hikvision, Matrix) belong to their respective owners and are used for
-identification and comparison only.
+where applicable. Other names and marks (including those of the third-party
+components listed in the NOTICE file, and e.g. ZKTeco, Hikvision, Matrix) belong
+to their respective owners and are used for identification and comparison only.
 
 >>> REMINDER: This is a TEMPLATE. Do not use in a sale without review by counsel. <<<

@@ -63,6 +63,12 @@ export interface Strings {
   notAuthorized: string;
   offSchedule: string;
   denied: string;
+  /** Validity window ended (reason "expired" on a not_authorized decision). */
+  expired: string;
+  /** Validity window not started yet (reason "not_yet_valid"). */
+  notYetValid: string;
+  /** Idle-footer privacy statement — on-prem processing, nothing leaves the site. */
+  privacyLine: string;
   cameraBlocked: string;
   cameraBlockedHint: string;
   connecting: string;
@@ -80,6 +86,10 @@ const STRINGS: Record<Locale, Strings> = {
     notAuthorized: "Accès non autorisé",
     offSchedule: "Hors plage horaire",
     denied: "Accès refusé",
+    expired: "Accès expiré — contactez l'accueil",
+    notYetValid: "Accès pas encore actif — contactez l'accueil",
+    privacyLine:
+      "Traitement 100 % local — vos données ne quittent pas le site.",
     cameraBlocked: "Caméra indisponible",
     cameraBlockedHint: "Autorisez l'accès à la caméra pour ce terminal.",
     connecting: "Connexion…",
@@ -95,6 +105,9 @@ const STRINGS: Record<Locale, Strings> = {
     notAuthorized: "Access not authorized",
     offSchedule: "Outside schedule",
     denied: "Access denied",
+    expired: "Access expired — please see reception",
+    notYetValid: "Access not yet active — please see reception",
+    privacyLine: "100% local processing — your data never leaves the site.",
     cameraBlocked: "Camera unavailable",
     cameraBlockedHint: "Allow camera access for this terminal.",
     connecting: "Connecting…",
@@ -110,6 +123,9 @@ const STRINGS: Record<Locale, Strings> = {
     notAuthorized: "الدخول غير مصرح به",
     offSchedule: "خارج أوقات الدوام",
     denied: "تم رفض الدخول",
+    expired: "انتهت صلاحية الدخول — يرجى مراجعة الاستقبال",
+    notYetValid: "الدخول غير مفعّل بعد — يرجى مراجعة الاستقبال",
+    privacyLine: "معالجة محلية 100٪ — بياناتك لا تغادر الموقع.",
     cameraBlocked: "الكاميرا غير متاحة",
     cameraBlockedHint: "اسمح بالوصول إلى الكاميرا لهذا الجهاز.",
     connecting: "جارٍ الاتصال…",

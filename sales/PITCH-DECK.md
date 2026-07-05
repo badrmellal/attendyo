@@ -1,7 +1,7 @@
 # Pitch deck — outline & speaker notes
 
 A 12-slide narrative for a 10–15 minute sales meeting with a Moroccan enterprise,
-residence syndic, bank, municipality, or industrial buyer. Each slide gives the **on-slide
+residence syndic, bank, municipality, industrial, or **university** buyer. Each slide gives the **on-slide
 content** (keep it sparse — visuals over text) and **speaker notes** (what you actually
 say). Brand the deck from the deployment's identity; "Liwan / لِيوان" is the default.
 
@@ -33,6 +33,7 @@ that matters for [their world]."
 - Residential: *Lost cards. Cloned cards. Re-issuing fees. A notebook for visitors.*
 - Bank/Gov: *Biometric data in someone's cloud. Recurring bills. Audit gaps.*
 - Industrial/Corporate: *Buddy-punching. A terminal per door. Caps at 3,000 faces.*
+- University: *Lent student cards. Signature sheets signed for friends. Open labs.*
 
 **Speaker notes:** "Today you're [losing cards every week / sending staff data to a vendor
 cloud / buying a terminal for every door]. Each of those is a cost, a security hole, or a
@@ -138,12 +139,17 @@ suggested list price.)*
 ## Slide 10 — Built for your vertical
 
 **On slide:** one panel for the buyer in the room — *pain → Liwan answer → trigger* —
-pulled from VERTICALS.md (residence / bank / municipality / industrial / corporate).
+pulled from VERTICALS.md (residence / bank / municipality / industrial / corporate /
+university).
 
 **Speaker notes:** *(Use only the panel that matches.)* e.g. residential: "For a residence,
 the win is simple: the face replaces the card. No more lost badges, no more re-issuing fees,
 no more cloned cards at the gate. Move someone in with a photo; move them out by archiving
-them — access gone instantly."
+them — access gone instantly." For a university: "The face is the student card — amphi
+presence can't be signed for a friend, exam-hall identity is checked at the door, labs and
+the bibliothèque get per-building schedules, and exchange students' access expires by
+itself at semester's end. Campus mode relabels the whole console — étudiants, faculté,
+rapports per dean — and the rentrée is one CSV import."
 
 ---
 

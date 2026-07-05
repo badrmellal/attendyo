@@ -21,6 +21,7 @@ import type { Branding } from "@/lib/types";
 import { getSettings } from "@/lib/api";
 import { DEFAULT_BRANDING, applyBranding } from "@/lib/branding";
 import { t as translate, decisionLabel, statusLabel } from "@/lib/i18n";
+import { terminologyLabels, type TerminologyLabels } from "@/lib/terminology";
 
 type Theme = "dark" | "light";
 
@@ -34,6 +35,8 @@ type BrandingContextValue = {
   t: (key: string) => string;
   decisionLabel: (decision: Parameters<typeof decisionLabel>[1]) => string;
   statusLabel: (status: Parameters<typeof statusLabel>[1]) => string;
+  /** Vertical-specific labels ("workforce" | "campus" | "residence"). */
+  term: TerminologyLabels;
 };
 
 const BrandingContext = createContext<BrandingContextValue | null>(null);
@@ -63,14 +66,19 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
     window.localStorage.setItem(THEME_KEY, theme);
   }, [theme]);
 
-  // Load branding tokens once and apply.
+  // Load branding tokens once and apply. Older backends may not send the v2
+  // `terminology` preset yet — normalize to "workforce" so labels never break.
   useEffect(() => {
     let active = true;
     getSettings()
       .then((s) => {
         if (!active) return;
-        setBrandingState(s.branding);
-        applyBranding(s.branding);
+        const branding: Branding = {
+          ...s.branding,
+          terminology: s.branding.terminology ?? "workforce",
+        };
+        setBrandingState(branding);
+        applyBranding(branding);
       })
       .catch(() => {
         if (!active) return;
@@ -101,6 +109,7 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
       t: (key: string) => translate(branding.locale, key),
       decisionLabel: (d) => decisionLabel(branding.locale, d),
       statusLabel: (s) => statusLabel(branding.locale, s),
+      term: terminologyLabels(branding.terminology),
     }),
     [branding, loading, theme, toggleTheme, setBranding],
   );

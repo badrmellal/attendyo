@@ -14,9 +14,9 @@ the internet.
 
 | Component            | Tech            | Port | Role                                                                 |
 |----------------------|-----------------|------|---------------------------------------------------------------------|
-| **CompreFace engine**| Java + Python   | 8000 | The recognition core. Stores subjects + embeddings, exposes `recognize` / `enroll`. Ships in a **CPU MobileNet** build. Apache-2.0, © Exadel. |
-| **PostgreSQL**       | Postgres        | 5432 | One instance, two schemas: CompreFace owns `public`; Liwan owns `liwan`. |
-| **Liwan API**        | FastAPI (Python)| 8088 | Implements the contract. The only thing the UIs and devices talk to. Calls CompreFace, writes the `liwan` schema, fires door drivers. |
+| **Liwan Vision Engine** | Java + Python | 8000 | The recognition core. Stores subjects + embeddings, exposes `recognize` / `enroll`. Ships in a **CPU MobileNet** build. Incorporates open-source components — attribution in `NOTICE`. |
+| **PostgreSQL**       | Postgres        | 5432 | One instance, two schemas: the engine owns `public`; Liwan owns `liwan`. |
+| **Liwan API**        | FastAPI (Python)| 8088 | Implements the contract. The only thing the UIs and devices talk to. Calls the engine, writes the `liwan` schema, fires door drivers. |
 | **Console**          | Next.js         | 3000 | Admin dashboard: login, today overview, enrolment, attendance + CSV, live monitor, doors/cameras, settings/branding. |
 | **Gate**             | Next.js         | 3001 | Fullscreen door kiosk: webcam, greet-by-name, door-open animation. For a wall tablet. |
 | **Bridge**           | Python worker   | —    | Optional. Pulls frames from a fixed RTSP/USB camera and POSTs them to `/api/recognize`. Enabled with the `cameras` compose profile. |
@@ -41,7 +41,7 @@ sequenceDiagram
     autonumber
     participant D as Camera / Gate
     participant A as Liwan API (:8088)
-    participant C as CompreFace (:8000)
+    participant C as Vision Engine (:8000)
     participant P as Postgres (liwan)
     participant R as Door driver
 
@@ -82,7 +82,16 @@ Grouped by who calls them. Full shapes live in [`../CONTRACT.md`](../CONTRACT.md
 - **Doors & cameras** — `GET/POST /api/doors`, `POST /api/doors/{id}/open` (test pulse),
   `GET/POST /api/cameras`, plus patch/delete.
 - **Settings / branding** — `GET /api/settings`, `PUT /api/settings` (admin).
-- **Health** — `GET /health` → `{ status, compreface, db }`.
+- **Reports (v2)** — `GET /api/reports/summary|departments|members`,
+  `GET /api/reports/export.csv`.
+- **Presence / muster (v2)** — `GET /api/presence/now` (live on-site list, printable
+  evacuation view).
+- **Alerts (v2)** — `GET /api/alerts`, `GET /api/alerts/count`,
+  `POST /api/alerts/{id}/ack`, `POST /api/alerts/ack-all`; SSE `event: alert`.
+- **Audit (v2, admin)** — `GET /api/audit` (append-only operator audit trail).
+- **Team (v2, admin)** — `GET/POST /api/users`, `PATCH/DELETE /api/users/{id}`.
+- **Bulk import (v2)** — `POST /api/members/import` (CSV).
+- **Health** — `GET /health` → overall status plus per-dependency engine / DB status.
 
 ---
 
@@ -91,9 +100,11 @@ Grouped by who calls them. Full shapes live in [`../CONTRACT.md`](../CONTRACT.md
 Implemented by the API on every `POST /api/recognize`. Evaluated top-down; the first
 rule that matches wins. This is the security heart of the product — fail closed.
 
-1. CompreFace returns subjects with similarity. **Take the top match.**
+1. The engine returns subjects with similarity. **Take the top match.**
 2. `similarity < camera.recognition_threshold` → **`unknown_face`** — door stays shut.
 3. Match found but member `status != active` → **`not_authorized`**.
+3b. Member has a validity window and today is outside `[valid_from, valid_until]`
+    → **`not_authorized`**, reason `expired` (or `not_yet_valid`). (v2)
 4. Member's access group does not include this door → **`not_authorized`**.
 5. Current time is outside the access group's schedule → **`off_schedule`**.
 6. Otherwise → **`granted`**: fire the door driver, write the event, update attendance.
@@ -127,7 +138,7 @@ day from its events yields the same `attendance_days` row.
 
 ## 6. Database overview (schema `liwan`)
 
-The application schema is deliberately separate from CompreFace's `public` schema so the
+The application schema is deliberately separate from the engine's `public` schema so the
 two never collide in the shared Postgres instance.
 
 ```mermaid
@@ -140,22 +151,40 @@ erDiagram
     members ||--o{ access_events : generates
     members ||--o{ attendance_days : "rolls up to"
     sites ||--o{ attendance_days : scopes
+    access_events ||--o{ alerts : raises
+    users ||--o{ audit_log : writes
 
     sites { uuid id; text name; time workday_start; int grace_minutes }
     doors { uuid id; text driver; jsonb driver_config; int relock_seconds; text direction }
     cameras { uuid id; numeric recognition_threshold; numeric det_prob_threshold }
     access_groups { uuid id; uuid_arr door_ids; jsonb schedule }
-    members { uuid id; text full_name; text subject_name; text member_type; text status }
+    members { uuid id; text full_name; text subject_name; text member_type; text status; date valid_from; date valid_until }
     access_events { bigserial id; timestamptz ts; numeric similarity; text decision }
     attendance_days { bigserial id; date work_date; timestamptz first_in_ts; timestamptz last_out_ts; bool is_late; text status }
+    alerts { bigserial id; timestamptz ts; text kind; text severity; bool acknowledged }
+    audit_log { bigserial id; timestamptz ts; text user_email; text action; text entity }
     settings { text key; jsonb value }
     users { uuid id; text email; text role }
 ```
 
 Key points:
 
-- **`members.subject_name`** is the link to a CompreFace subject. Deleting a member
+- **`members.subject_name`** is the link to an engine subject. Deleting a member
   deletes that subject too.
+- **`members.valid_from` / `valid_until`** (v2) bound a member's access to a date
+  window — temporary access for visitors, contractors, exchange students, and
+  *vacataires*. Outside the window a match is denied with reason `expired` (or
+  `not_yet_valid`); no operator action is needed on the end date.
+- **`alerts`** (v2) — one row per non-granted decision (kind = `unknown_face` /
+  `not_authorized` / `off_schedule` / `system`, plus severity). Operators acknowledge
+  them (`acknowledged_by` / `acknowledged_at`); the unacknowledged count drives the
+  Console badge, and each new alert is also published on the SSE stream
+  (`event: alert`).
+- **`audit_log`** (v2) — append-only operator audit trail. Every mutating operator
+  action (logins, member/door/camera/access-group/settings/user changes, manual door
+  opens, alert acks) is recorded with the acting user, action, entity, and details.
+  There is no update or delete path through the API — admins can only read it
+  (`GET /api/audit`).
 - **`doors.driver` / `driver_config`** make the relay pluggable per door:
   `webhook` → `{url, method, on_grant, on_deny, headers}`, `pi_gpio` → `{pin, active_high, host}`,
   `simulation` → `{}` (logs + pushes to the Gate UI). See
@@ -176,8 +205,8 @@ Indexes ship for the hot read paths: `access_events(ts DESC)`, `(member_id)`,
 
 Liwan is designed to be *enough* on a single commodity box. There is no GPU in the path.
 
-**Where the work is.** Recognition cost lives almost entirely in the CompreFace core
-(`liwan-compreface-core`, MobileNet build). The Liwan API, Postgres, and the Next.js
+**Where the work is.** Recognition cost lives almost entirely in the engine core
+(`liwan-engine-core`, MobileNet build). The Liwan API, Postgres, and the Next.js
 apps are light. So you scale the core first.
 
 **Levers you already have (in `.env`):**
@@ -185,7 +214,7 @@ apps are light. So you scale the core first.
 - `uwsgi_processes` / `uwsgi_threads` — concurrency of the recognition core. More
   processes = more parallel recognitions, at the cost of RAM. Start at `2`/`2`; raise on
   bigger CPUs.
-- `compreface_api_java_options` / `compreface_admin_java_options` — JVM heaps
+- the engine api/admin `*_java_options` vars — JVM heaps
   (`-Xmx4g` / `-Xmx2g` defaults). Raise for large subject sets.
 - `max_detect_size` (`IMG_LENGTH_LIMIT`) — cap the longest image edge (default 1440).
   Smaller frames recognise faster; the Bridge/Gate can downscale before sending.
@@ -216,7 +245,7 @@ disk/RAM, **not** by firmware as with hardware terminals — this is a core diff
 
 ## 8. Failure behaviour (fail closed)
 
-- **CompreFace down** → `/health` reports `compreface: "down"`; `/api/recognize` cannot
+- **Engine down** → `/health` reports the engine as `"down"`; `/api/recognize` cannot
   match, so it returns `unknown_face` and the door stays shut. No "fail open."
 - **DB down** → `/health` reports `db: "down"`; writes fail loudly rather than silently
   dropping events.

@@ -14,7 +14,7 @@
 **On-premise face attendance & access control.**
 Sold once. Owned forever. Runs on your own LAN — no cloud, no subscription, no RFID cards to lose.
 
-`Recognition engine: CompreFace (Apache-2.0)` · `CPU-only` · `Unlimited enrolled faces` · `Morocco Law 09-08 / CNDP-friendly by design`
+`Liwan Vision Engine` · `CPU-only` · `Unlimited enrolled faces` · `Morocco Law 09-08 / CNDP-friendly by design`
 
 <br>
 
@@ -49,8 +49,15 @@ without touching the code. "Liwan" is only the factory default.
 Enterprise face attendance & access control that lives **entirely on your premises** —
 no cloud, no subscription, no RFID cards to lose. One photo enrolls a person; the door
 opens when it knows them; every entry and exit is logged for the day. Built for the
-Moroccan enterprise, government, residential, and banking market, where biometric data
-must stay inside the country and inside the building.
+Moroccan enterprise, government, residential, banking, and **university & campus**
+market, where biometric data must stay inside the country and inside the building.
+
+**Campus mode.** Universities run the same install with the `campus` terminology
+preset (`branding.terminology`): the Console speaks *Étudiants & Personnel* and
+*Faculté / École* instead of employees and departments, the `student` / `faculty` /
+`staff` member types surface first, and validity windows (`valid_from` / `valid_until`)
+give exchange students and *vacataires* access that expires by itself. Presets ship
+for `workforce`, `campus`, and `residence` — relabel, don't re-code.
 
 ## Why Liwan (the differentiators)
 
@@ -103,6 +110,16 @@ must stay inside the country and inside the building.
   </tr>
   <tr>
     <td valign="top">
+      <img src="docs/screenshots/reports.png" alt="Reports — punctuality rate, daily presence chart, per-department analytics">
+      <sub><b>Reports.</b> Punctuality, daily presence trend, per-department analytics — CSV export and a print-ready director's report.</sub>
+    </td>
+    <td valign="top">
+      <img src="docs/screenshots/alerts.png" alt="Alerts — unknown faces and denied access, acknowledge workflow">
+      <sub><b>Alerts.</b> Unknown faces and denied attempts land as live, acknowledgeable alerts — with an audit trail.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td valign="top">
       <img src="docs/screenshots/doors.png" alt="Doors and cameras — drivers, thresholds, test-open">
       <sub><b>Doors &amp; cameras.</b> Per-door driver (webhook · Pi GPIO · simulation), relock, thresholds, test-open.</sub>
     </td>
@@ -128,7 +145,7 @@ flowchart LR
 
     subgraph Server["Single CPU server (Docker)"]
         API["Liwan API<br/>(FastAPI · :8088)"]
-        CF["CompreFace engine<br/>(recognise / enroll · :8000 UI)"]
+        CF["Liwan Vision Engine<br/>(recognise / enroll · :8000 console)"]
         DB[("PostgreSQL<br/>schema 'liwan'")]
     end
 
@@ -150,7 +167,7 @@ flowchart LR
 ```
 
 **Data flow, one decision:** a frame reaches `POST /api/recognize` → the API calls the
-CompreFace `recognize` endpoint → it takes the top match, checks the camera's similarity
+engine's `recognize` endpoint → it takes the top match, checks the camera's similarity
 threshold, the member's status, their access group, and the schedule → writes an
 `access_event` → rolls the day's `attendance_days` row (first-in / last-out) → fires the
 door driver when the decision is `granted`. The full decision ladder is in
@@ -171,12 +188,15 @@ cp .env.example .env
 # 2) Bring up the full stack (engine + API + Console + Gate).
 docker compose up -d
 
-# 3) Create the recognition key (one time).
-#    Open the CompreFace admin UI:
-open http://localhost:8000        # or browse to it from another LAN machine
-#    Create an application → add a "Recognition" service → copy its API key.
-#    Paste it into .env as COMPREFACE_API_KEY, then:
+# 3) Provision the vision engine (one command, one time).
+#    Registers the engine admin, creates the application + Recognition service,
+#    prints the API key, and writes it into .env as ENGINE_API_KEY:
+python scripts/provision_engine.py \
+  --email admin@example.com --password 'a-strong-password' --write-env
 docker compose up -d liwan-api    # restart the API so it picks up the key
+#    Fallback (if the script cannot complete): open the engine console at
+#    http://localhost:8000, create an application → add a "Recognition"
+#    service → copy its API key → paste it into .env as ENGINE_API_KEY.
 
 # 4) Seed a demo site, doors, access group and a few members.
 python scripts/seed_demo.py       # talks only to the local API
@@ -199,11 +219,11 @@ docker compose --profile cameras up -d liwan-bridge
 
 | Port  | Service              | Audience              | Purpose                                                        |
 |-------|----------------------|-----------------------|----------------------------------------------------------------|
-| 8000  | CompreFace admin UI  | installer (one time)  | Create the Recognition service + API key; engine config        |
+| 8000  | Engine console       | installer (one time)  | Create the Recognition service + API key; engine config        |
 | 8088  | Liwan API (FastAPI)  | apps, devices, Bridge | The contract — REST + SSE; `/api/recognize` is the hot path    |
 | 3000  | Liwan Console        | operators / admins    | Login, dashboard, enrolment, attendance, CSV, live monitor     |
 | 3001  | Liwan Gate           | visitors at the door  | Fullscreen kiosk: webcam, greet-by-name, door-open animation   |
-| 5432  | PostgreSQL           | internal only         | Shared DB; CompreFace owns `public`, Liwan owns schema `liwan`  |
+| 5432  | PostgreSQL           | internal only         | Shared DB; the engine owns `public`, Liwan owns schema `liwan`  |
 
 > Only expose what you must. In production, publish 3000 / 3001 / 8088 on the LAN and
 > keep 5432 and 8000 internal. See [`docs/INSTALL.md`](docs/INSTALL.md) for firewalling.
@@ -214,7 +234,7 @@ docker compose --profile cameras up -d liwan-bridge
 liwan/
 ├── README.md                 # this file
 ├── LICENSE                   # commercial / perpetual EULA TEMPLATE (review with counsel)
-├── NOTICE                    # third-party attribution (CompreFace, Apache-2.0)
+├── NOTICE                    # third-party open-source attribution (Apache-2.0)
 ├── CONTRACT.md               # the API + data contract (source of truth for all modules)
 ├── docker-compose.yml        # full on-prem stack on one box
 ├── .env.example              # runtime configuration; copy to .env
@@ -231,6 +251,7 @@ liwan/
 │   ├── console/              # admin dashboard (Next.js, :3000)
 │   └── gate/                 # door kiosk (Next.js, :3001)
 ├── scripts/
+│   ├── provision_engine.py   # one-command vision-engine bootstrap (admin, app, key)
 │   └── seed_demo.py          # seed demo site/doors/members against the local API
 │
 ├── docs/
@@ -252,10 +273,7 @@ liwan/
 - **Liwan application code** (API, Console, Gate, Bridge, scripts, docs) is offered under
   a **one-time perpetual commercial licence**. The bundled [`LICENSE`](LICENSE) is a
   **template** EULA — have it reviewed by qualified legal counsel before use in a sale.
-- **Liwan bundles the [CompreFace](https://github.com/exadel-inc/CompreFace) face
-  recognition engine**, © Exadel Inc., licensed under **Apache License 2.0**. Liwan does
-  not modify CompreFace; it runs the official images and calls its HTTP API. The full
-  attribution and the obligations Liwan carries forward to its buyers are in
+- Liwan's vision engine incorporates open-source components; full attribution in
   [`NOTICE`](NOTICE).
 - Trademarks named for comparison (ZKTeco, Hikvision, Matrix COSEC) belong to their
   respective owners and are used only for factual, descriptive comparison.

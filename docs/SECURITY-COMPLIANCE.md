@@ -53,7 +53,7 @@ processing. As the **data controller**, the buyer is responsible for, at minimum
    a **non-biometric alternative** where required (e.g. a manual register), and document
    that choice.
 4. **Data-subject rights.** Have a process to honour access/rectification/erasure requests
-   — Liwan supports this operationally (delete a member removes their CompreFace subject;
+   — Liwan supports this operationally (delete a member removes their engine subject;
    see §5).
 5. **Security & retention measures** proportionate to the sensitivity (this document and
    the controls below help, but the buyer must adopt and enforce them).
@@ -102,6 +102,13 @@ What Liwan provides, and how to operate it safely.
 - **Full audit trail.** Every decision — granted *and* denied — is written to
   `access_events` with similarity, door, time, and reason. Attendance is a reproducible
   roll-up of that trail.
+- **Append-only operator audit log.** Beyond door decisions, every mutating *operator*
+  action — logins, member create/update/delete/import, door and camera changes, manual
+  door opens, access-group and settings changes, team-account changes, alert
+  acknowledgements — is written to `audit_log` with the acting user's identity (from
+  their JWT), the action, the entity, and details. The API exposes it read-only to
+  admins (`GET /api/audit`); there is no update or delete path, so "who changed what,
+  when" is answerable and defensible in an internal or regulator audit.
 
 **What the buyer must configure**
 
@@ -109,14 +116,14 @@ What Liwan provides, and how to operate it safely.
   `LIWAN_ADMIN_PASSWORD`, `LIWAN_DEVICE_KEY`, and the `admin@liwan.local` password. The
   defaults in `.env.example` are placeholders, not credentials.
 - **Lock down the network.** Publish only Console/Gate/API on the LAN; keep Postgres
-  (5432) and the CompreFace admin UI (8000) internal. Use a host firewall and, ideally, a
+  (5432) and the engine console (8000) internal. Use a host firewall and, ideally, a
   TLS reverse proxy so logins/tokens are encrypted even on the LAN. (See
   [`INSTALL.md`](INSTALL.md) §5.)
 - **Least privilege for operators.** Give reception `viewer`/`operator`, reserve `admin`
   for the few who manage settings and enrolment.
 - **Physical security.** The server box and door tablets are part of the trust boundary —
   lock the rack, secure the tablets in kiosk mode, protect backups.
-- **Patch.** Pin and update the CompreFace images and the host OS on a schedule.
+- **Patch.** Pin and update the engine images and the host OS on a schedule.
 
 ---
 
@@ -138,7 +145,7 @@ A common, fair question from security and privacy reviewers.
   source images, you can reduce snapshot/image retention (§6) — at the cost of
   visual auditability.
 - **Erasure works at the source:** deleting a member (`DELETE /api/members/{id}`) removes
-  the CompreFace subject (its template) as well as the Liwan record, satisfying a
+  the engine subject (its template) as well as the Liwan record, satisfying a
   right-to-erasure request for that person's biometric data.
 
 ---

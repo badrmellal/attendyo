@@ -6,6 +6,7 @@
  * product. Collapses to icons on mobile via a slide-over (handled by TopBar).
  */
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -16,19 +17,29 @@ import {
   DoorOpen,
   Settings,
   ShieldCheck,
+  BarChart3,
+  Building2,
+  BellRing,
+  KeyRound,
+  UsersRound,
   type LucideIcon,
 } from "lucide-react";
 import { BrandLogo } from "./BrandLogo";
 import { useBranding } from "./BrandingProvider";
+import { me } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
-type Item = { href: string; labelKey: string; icon: LucideIcon };
+type Item = { href: string; labelKey: string; icon: LucideIcon; adminOnly?: boolean };
 type Group = { titleKey: string; items: Item[] };
 
 const GROUPS: Group[] = [
   {
     titleKey: "nav.section.overview",
-    items: [{ href: "/dashboard", labelKey: "nav.dashboard", icon: LayoutDashboard }],
+    items: [
+      { href: "/dashboard", labelKey: "nav.dashboard", icon: LayoutDashboard },
+      { href: "/reports", labelKey: "nav.reports", icon: BarChart3 },
+      { href: "/presence", labelKey: "nav.presence", icon: Building2 },
+    ],
   },
   {
     titleKey: "nav.section.access",
@@ -36,18 +47,39 @@ const GROUPS: Group[] = [
       { href: "/people", labelKey: "nav.people", icon: Users },
       { href: "/attendance", labelKey: "nav.attendance", icon: CalendarClock },
       { href: "/monitor", labelKey: "nav.monitor", icon: MonitorPlay },
+      { href: "/alerts", labelKey: "nav.alerts", icon: BellRing },
       { href: "/doors", labelKey: "nav.doors", icon: DoorOpen },
+      { href: "/groups", labelKey: "nav.groups", icon: KeyRound },
     ],
   },
   {
     titleKey: "nav.section.admin",
-    items: [{ href: "/settings", labelKey: "nav.settings", icon: Settings }],
+    items: [
+      { href: "/team", labelKey: "nav.team", icon: UsersRound, adminOnly: true },
+      { href: "/settings", labelKey: "nav.settings", icon: Settings },
+    ],
   },
 ];
 
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
-  const { t } = useBranding();
+  const { t, term } = useBranding();
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  // Admin-only items appear once the operator's role is confirmed.
+  useEffect(() => {
+    let active = true;
+    me()
+      .then((u) => active && setIsAdmin(u.role === "admin"))
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  /** The people entry is relabelled by the terminology preset (campus mode…). */
+  const labelFor = (item: Item) =>
+    item.href === "/people" ? term.peopleNav : t(item.labelKey);
 
   return (
     <nav className="flex h-full w-64 flex-col border-r border-border bg-surface/60 backdrop-blur-sm">
@@ -64,7 +96,9 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
               {t(group.titleKey)}
             </p>
             <ul className="space-y-0.5">
-              {group.items.map((item) => {
+              {group.items
+                .filter((item) => !item.adminOnly || isAdmin)
+                .map((item) => {
                 const active =
                   pathname === item.href || pathname.startsWith(`${item.href}/`);
                 const Icon = item.icon;
@@ -91,7 +125,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
                         )}
                         size={18}
                       />
-                      {t(item.labelKey)}
+                      {labelFor(item)}
                     </Link>
                   </li>
                 );

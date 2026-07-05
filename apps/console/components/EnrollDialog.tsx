@@ -17,18 +17,14 @@ import {
   RefreshCw,
   CircleAlert,
   CheckCircle2,
+  CalendarRange,
 } from "lucide-react";
 import { Dialog } from "./Dialog";
+import { useBranding } from "./BrandingProvider";
 import { enrollMember } from "@/lib/api";
+import { memberTypeOptions } from "@/lib/terminology";
 import type { Member, MemberDraft, MemberType } from "@/lib/types";
 import { cn } from "@/lib/utils";
-
-const MEMBER_TYPES: { value: MemberType; label: string }[] = [
-  { value: "employee", label: "Employé" },
-  { value: "resident", label: "Résident" },
-  { value: "contractor", label: "Prestataire" },
-  { value: "visitor", label: "Visiteur" },
-];
 
 type Mode = "upload" | "webcam";
 
@@ -43,6 +39,7 @@ export function EnrollDialog({
   onEnrolled: (member: Member) => void;
   departments: string[];
 }) {
+  const { term } = useBranding();
   const [mode, setMode] = useState<Mode>("upload");
   const [draft, setDraft] = useState<MemberDraft>({ full_name: "", member_type: "employee" });
   const [image, setImage] = useState<Blob | null>(null);
@@ -158,6 +155,10 @@ export function EnrollDialog({
     }
     if (!image) {
       setError("Une photo est nécessaire — une seule suffit.");
+      return;
+    }
+    if (draft.valid_from && draft.valid_until && draft.valid_from > draft.valid_until) {
+      setError("La date de début d'accès doit précéder la date de fin.");
       return;
     }
     setSubmitting(true);
@@ -316,7 +317,7 @@ export function EnrollDialog({
                   setDraft((d) => ({ ...d, member_type: e.target.value as MemberType }))
                 }
               >
-                {MEMBER_TYPES.map((t) => (
+                {memberTypeOptions(term).map((t) => (
                   <option key={t.value} value={t.value}>
                     {t.label}
                   </option>
@@ -333,7 +334,7 @@ export function EnrollDialog({
             </Field>
           </div>
 
-          <Field label="Département">
+          <Field label={term.departmentLabel}>
             <input
               className="field w-full px-3 py-2 text-sm"
               list="enroll-departments"
@@ -375,6 +376,38 @@ export function EnrollDialog({
                 placeholder="+212 6…"
               />
             </Field>
+          </div>
+
+          {/* Temporary-access window (visitors, contractors, exchange students) */}
+          <div className="rounded-xl border border-border bg-surface-2/20 p-3">
+            <p className="mb-2 flex items-center gap-1.5 text-xs font-medium text-text">
+              <CalendarRange className="h-3.5 w-3.5 text-accent" />
+              Accès temporaire (optionnel)
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Valable du">
+                <input
+                  type="date"
+                  className="field tnum w-full px-3 py-2 text-sm"
+                  value={draft.valid_from ?? ""}
+                  max={draft.valid_until || undefined}
+                  onChange={(e) =>
+                    setDraft((d) => ({ ...d, valid_from: e.target.value || undefined }))
+                  }
+                />
+              </Field>
+              <Field label="Jusqu'au">
+                <input
+                  type="date"
+                  className="field tnum w-full px-3 py-2 text-sm"
+                  value={draft.valid_until ?? ""}
+                  min={draft.valid_from || undefined}
+                  onChange={(e) =>
+                    setDraft((d) => ({ ...d, valid_until: e.target.value || undefined }))
+                  }
+                />
+              </Field>
+            </div>
           </div>
 
           {error && (

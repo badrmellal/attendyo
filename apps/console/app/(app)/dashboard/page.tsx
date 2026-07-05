@@ -2,7 +2,8 @@
 
 /**
  * Dashboard — today at a glance.
- *  - Five stat cards: present, late, absent, on-site-now, denied.
+ *  - Six stat cards: present, late, absent, on-site-now (→ /presence),
+ *    unacknowledged alerts (→ /alerts), denied.
  *  - Hourly entries bar chart.
  *  - Live access feed (SSE).
  *  - Latest granted entries table.
@@ -15,6 +16,7 @@ import {
   Clock,
   UserX,
   Building2,
+  BellRing,
   ShieldAlert,
   Activity,
   ArrowDownLeft,
@@ -30,7 +32,13 @@ import { DecisionPill } from "@/components/StatusPill";
 import { Avatar } from "@/components/Avatar";
 import { EmptyState } from "@/components/EmptyState";
 import { useBranding } from "@/components/BrandingProvider";
-import { getTodayStats, listEvents } from "@/lib/api";
+import {
+  ALERTS_CHANGED_EVENT,
+  getAlertCount,
+  getTodayStats,
+  listEvents,
+  streamEvents,
+} from "@/lib/api";
 import type { AccessEvent, TodayStats } from "@/lib/types";
 import { formatTime, formatSimilarity } from "@/lib/utils";
 
@@ -49,9 +57,10 @@ function DirectionBadge({ direction }: { direction: AccessEvent["direction"] }) 
 }
 
 export default function DashboardPage() {
-  const { branding, t } = useBranding();
+  const { branding, t, term } = useBranding();
   const [stats, setStats] = useState<TodayStats | null>(null);
   const [events, setEvents] = useState<AccessEvent[]>([]);
+  const [unackAlerts, setUnackAlerts] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -65,6 +74,24 @@ export default function DashboardPage() {
       .finally(() => active && setLoading(false));
     return () => {
       active = false;
+    };
+  }, []);
+
+  // Unacknowledged alerts — refreshed live (SSE alerts + app-wide ack signal).
+  useEffect(() => {
+    let active = true;
+    const refresh = () => {
+      getAlertCount()
+        .then((c) => active && setUnackAlerts(c.unacknowledged))
+        .catch(() => {});
+    };
+    refresh();
+    const unsub = streamEvents(() => {}, { onAlert: refresh });
+    window.addEventListener(ALERTS_CHANGED_EVENT, refresh);
+    return () => {
+      active = false;
+      unsub();
+      window.removeEventListener(ALERTS_CHANGED_EVENT, refresh);
     };
   }, []);
 
@@ -131,14 +158,14 @@ export default function DashboardPage() {
         </div>
         {stats && (
           <p className="text-sm text-text-muted">
-            <span className="tnum font-semibold text-text">{stats.total_members}</span> membres
-            actifs
+            <span className="tnum font-semibold text-text">{stats.total_members}</span>{" "}
+            {term.activeCountLabel}
           </p>
         )}
       </div>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-6">
         <StatCard
           label={t("stat.present")}
           value={stats?.present ?? 0}
@@ -163,14 +190,26 @@ export default function DashboardPage() {
           loading={loading}
           sub="Aucun pointage"
         />
-        <StatCard
-          label={t("stat.onsite")}
-          value={stats?.on_site_now ?? 0}
-          icon={Building2}
-          tone="info"
-          loading={loading}
-          sub="Entrés, pas encore sortis"
-        />
+        <Link href="/presence" className="block" aria-label="Voir qui est sur site">
+          <StatCard
+            label={t("stat.onsite")}
+            value={stats?.on_site_now ?? 0}
+            icon={Building2}
+            tone="info"
+            loading={loading}
+            sub="Voir la liste sur site →"
+          />
+        </Link>
+        <Link href="/alerts" className="block" aria-label="Voir les alertes non acquittées">
+          <StatCard
+            label="Alertes"
+            value={unackAlerts}
+            icon={BellRing}
+            tone={unackAlerts > 0 ? "danger" : "muted"}
+            loading={loading}
+            sub={unackAlerts > 0 ? "Non acquittées — voir →" : "Rien à acquitter"}
+          />
+        </Link>
         <StatCard
           label={t("stat.denied")}
           value={stats?.denied_today ?? 0}

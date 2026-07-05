@@ -15,7 +15,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from starlette.concurrency import run_in_threadpool
 
-from ..core import db, security
+from ..core import audit, db, security
 from ..models.schemas import Camera, CameraCreate, CameraUpdate
 
 logger = logging.getLogger("liwan.cameras.router")
@@ -52,7 +52,7 @@ async def list_cameras(_user: dict = Depends(security.get_current_user)) -> list
 @router.post("", response_model=Camera, status_code=status.HTTP_201_CREATED)
 async def create_camera(
     payload: CameraCreate,
-    _user: dict = Depends(security.get_current_user),
+    user: dict = Depends(security.require_operator),
 ) -> Camera:
     row = await run_in_threadpool(
         db.execute_returning,
@@ -68,6 +68,10 @@ async def create_camera(
         ),
     )
     assert row is not None
+    await run_in_threadpool(
+        audit.record, user, "camera.create", entity="camera", entity_id=str(row["id"]),
+        details={"name": payload.name},
+    )
     return _to_camera(row)
 
 
@@ -75,7 +79,7 @@ async def create_camera(
 async def update_camera(
     camera_id: str,
     payload: CameraUpdate,
-    _user: dict = Depends(security.get_current_user),
+    user: dict = Depends(security.require_operator),
 ) -> Camera:
     updates = payload.model_dump(exclude_unset=True)
     if not updates:
@@ -96,17 +100,24 @@ async def update_camera(
     )
     if row is None:
         raise HTTPException(status_code=404, detail="Camera not found")
+    await run_in_threadpool(
+        audit.record, user, "camera.update", entity="camera", entity_id=camera_id,
+        details={"fields": sorted(updates.keys())},
+    )
     return _to_camera(row)
 
 
 @router.delete("/{camera_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_camera(
     camera_id: str,
-    _user: dict = Depends(security.get_current_user),
+    user: dict = Depends(security.require_operator),
 ) -> None:
     affected = await run_in_threadpool(
         db.execute, "DELETE FROM cameras WHERE id = %s", (camera_id,)
     )
     if affected == 0:
         raise HTTPException(status_code=404, detail="Camera not found")
+    await run_in_threadpool(
+        audit.record, user, "camera.delete", entity="camera", entity_id=camera_id,
+    )
     return None

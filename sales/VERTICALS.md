@@ -1,12 +1,13 @@
 # Verticals — who buys Liwan, and why
 
-Five markets, each with the **pain** they feel today, the **Liwan answer**, and the
+Six markets, each with the **pain** they feel today, the **Liwan answer**, and the
 **buying trigger** — the moment the deal becomes urgent. Lead with **residential**: the
 lost-RFID-card story is the fastest "yes" in the Moroccan market.
 
 > One install fits all of these: the data model (`member_type` = employee / resident /
-> contractor / visitor, generic `members`, access groups, daily attendance) is deliberately
-> the same product, rebranded per buyer (`GET /api/settings → branding`).
+> contractor / visitor / student / faculty / staff, generic `members`, access groups,
+> daily attendance, validity windows) is deliberately the same product, rebranded and
+> re-labelled per buyer (`GET /api/settings → branding`, incl. `terminology` presets).
 
 ---
 
@@ -122,6 +123,38 @@ attendance tool; leadership wanting a visibly modern workplace.
 
 ---
 
+## 6. Universités & campus
+
+**The pain — the carte étudiant that proves nothing.**
+The student card is lost, lent, or photocopied — a **carte étudiant perdue ou prêtée**
+is the campus version of the cloned RFID badge. Amphi attendance is a signature sheet
+signed by a friend (**fraude au pointage / proxy attendance**), so the scholarship and
+assiduité records are fiction. Labs, the **bibliothèque**, and the **cité universitaire**
+need real access control, not a guard glancing at a card. Exam halls need **identity
+checks** at the door — is the person sitting the exam the person enrolled? And every
+September, thousands of new students and dozens of *vacataires* and exchange students
+must be onboarded, and last year's must stop working.
+
+**The Liwan answer.**
+The same install, switched to **campus terminology mode** (`branding.terminology =
+"campus"`): the console speaks *Étudiants & Personnel* and *Faculté / École*, with
+**student / faculty / staff** member types first. The **face is the student card** —
+amphi presence is recorded per person per day, un-lendable, killing proxy attendance;
+the same recognition serves as an **exam-hall identity check** at the door. **Per-building
+access groups with schedules** put the labs, the bibliothèque, and the cité universitaire
+each behind their own doors and hours. **Exchange students and vacataires get temporary
+access** (`valid_from` / `valid_until`) that expires by itself at semester's end. The
+rentrée is a **CSV import** of the enrolment list plus one photo per person; **reports
+per faculté** give each dean their own attendance picture. One server covers the campus;
+data stays on the university's own LAN (Law 09-08 / CNDP).
+
+**The buying trigger.**
+The **rentrée** (the yearly onboarding crunch), a **new campus building** to secure, a
+**security incident** at a residence or lab, an assiduité/scholarship audit that exposes
+signature-sheet fraud, or an exam-integrity push after an impersonation case.
+
+---
+
 ## Cross-vertical cheat sheet
 
 | Vertical        | Headline pain               | Liwan one-liner                                              | Trigger to watch for                    |
@@ -131,6 +164,7 @@ attendance tool; leadership wanting a visibly modern workplace.
 | **Government**  | No recurring bills, sovereignty | "Buy once, own it, in-country, offline-capable."        | Modernisation / capital budget / sovereignty |
 | **Industrial**  | Churn, shifts, harsh gates  | "Unlimited faces, many gates, accurate shift hours."       | Safety muster / payroll dispute / expansion |
 | **Corporate**   | Buddy-punching, too many SaaS| "Your face is your timesheet — on your server, your brand."| Office move / HR mandate / privacy review |
+| **University**  | Lent cards, proxy attendance | "The face is the student card — presence that can't be signed for a friend." | Rentrée / new building / security incident |
 
 > Selling tip: every vertical hears the same three proofs — **one-time on-prem**, **data
 > stays on the LAN (CNDP)**, **unlimited faces from one photo, no cards** — but lead with

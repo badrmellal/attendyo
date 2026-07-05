@@ -17,7 +17,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from starlette.concurrency import run_in_threadpool
 
-from ..core import db, security
+from ..core import audit, db, security
 from ..models.schemas import AccessGroup, AccessGroupCreate, AccessGroupUpdate
 
 logger = logging.getLogger("liwan.access_groups.router")
@@ -50,7 +50,7 @@ async def list_access_groups(
 @router.post("", response_model=AccessGroup, status_code=status.HTTP_201_CREATED)
 async def create_access_group(
     payload: AccessGroupCreate,
-    _user: dict = Depends(security.get_current_user),
+    user: dict = Depends(security.require_operator),
 ) -> AccessGroup:
     row = await run_in_threadpool(
         db.execute_returning,
@@ -62,6 +62,10 @@ async def create_access_group(
         (payload.name, payload.door_ids, json.dumps(payload.schedule)),
     )
     assert row is not None
+    await run_in_threadpool(
+        audit.record, user, "access_group.create", entity="access_group",
+        entity_id=str(row["id"]), details={"name": payload.name},
+    )
     return _to_group(row)
 
 
@@ -69,7 +73,7 @@ async def create_access_group(
 async def update_access_group(
     group_id: str,
     payload: AccessGroupUpdate,
-    _user: dict = Depends(security.get_current_user),
+    user: dict = Depends(security.require_operator),
 ) -> AccessGroup:
     updates = payload.model_dump(exclude_unset=True)
     if not updates:
@@ -96,17 +100,25 @@ async def update_access_group(
     )
     if row is None:
         raise HTTPException(status_code=404, detail="Access group not found")
+    await run_in_threadpool(
+        audit.record, user, "access_group.update", entity="access_group",
+        entity_id=group_id, details={"fields": sorted(updates.keys())},
+    )
     return _to_group(row)
 
 
 @router.delete("/{group_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_access_group(
     group_id: str,
-    _user: dict = Depends(security.get_current_user),
+    user: dict = Depends(security.require_operator),
 ) -> None:
     affected = await run_in_threadpool(
         db.execute, "DELETE FROM access_groups WHERE id = %s", (group_id,)
     )
     if affected == 0:
         raise HTTPException(status_code=404, detail="Access group not found")
+    await run_in_threadpool(
+        audit.record, user, "access_group.delete", entity="access_group",
+        entity_id=group_id,
+    )
     return None

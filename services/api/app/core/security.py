@@ -204,6 +204,20 @@ def require_admin(user: dict[str, Any] = Depends(get_current_user)) -> dict[str,
     return user
 
 
+def require_operator(user: dict[str, Any] = Depends(get_current_user)) -> dict[str, Any]:
+    """Guard for mutating day-to-day routes (enrol, CRUD, ack alerts, import).
+
+    ``admin`` and ``operator`` pass; ``viewer`` is read-only per the role
+    definitions in ``db/schema.sql``.
+    """
+    if user.get("role") not in ("admin", "operator"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Operator privileges required",
+        )
+    return user
+
+
 async def require_device_key(
     x_device_key: str | None = Header(default=None, alias="X-Device-Key"),
 ) -> str:

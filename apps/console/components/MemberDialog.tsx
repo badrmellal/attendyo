@@ -10,18 +10,13 @@
  */
 
 import { useEffect, useState } from "react";
-import { RefreshCw, CheckCircle2 } from "lucide-react";
+import { RefreshCw, CheckCircle2, CalendarRange } from "lucide-react";
 import { Dialog } from "./Dialog";
 import { FormField, FormError } from "./FormField";
+import { useBranding } from "./BrandingProvider";
 import { updateMember } from "@/lib/api";
+import { memberTypeOptions } from "@/lib/terminology";
 import type { AccessGroup, Member, MemberStatus, MemberType } from "@/lib/types";
-
-const MEMBER_TYPES: { value: MemberType; label: string }[] = [
-  { value: "employee", label: "Employé" },
-  { value: "resident", label: "Résident" },
-  { value: "contractor", label: "Prestataire" },
-  { value: "visitor", label: "Visiteur" },
-];
 
 const STATUSES: { value: MemberStatus; label: string }[] = [
   { value: "active", label: "Actif" },
@@ -38,6 +33,8 @@ type Form = {
   email: string;
   phone: string;
   access_group_id: string;
+  valid_from: string;
+  valid_until: string;
   status: MemberStatus;
 };
 
@@ -51,6 +48,8 @@ function toForm(m: Member): Form {
     email: m.email ?? "",
     phone: m.phone ?? "",
     access_group_id: m.access_group_id ?? "",
+    valid_from: m.valid_from ?? "",
+    valid_until: m.valid_until ?? "",
     status: m.status,
   };
 }
@@ -70,6 +69,7 @@ export function MemberDialog({
   onClose: () => void;
   onSaved: (member: Member) => void;
 }) {
+  const { term } = useBranding();
   const [form, setForm] = useState<Form | null>(member ? toForm(member) : null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -91,6 +91,10 @@ export function MemberDialog({
       setError("Le nom complet est requis.");
       return;
     }
+    if (form.valid_from && form.valid_until && form.valid_from > form.valid_until) {
+      setError("La date de début d'accès doit précéder la date de fin.");
+      return;
+    }
     setSubmitting(true);
     try {
       const saved = await updateMember(member.id, {
@@ -102,6 +106,9 @@ export function MemberDialog({
         email: form.email.trim() || undefined,
         phone: form.phone.trim() || undefined,
         access_group_id: form.access_group_id || undefined,
+        // Explicit null CLEARS a previously-set bound (contract PATCH semantics).
+        valid_from: form.valid_from || null,
+        valid_until: form.valid_until || null,
         status: form.status,
       });
       onSaved(saved);
@@ -161,7 +168,7 @@ export function MemberDialog({
               value={form.member_type}
               onChange={(e) => set("member_type", e.target.value as MemberType)}
             >
-              {MEMBER_TYPES.map((t) => (
+              {memberTypeOptions(term).map((t) => (
                 <option key={t.value} value={t.value}>
                   {t.label}
                 </option>
@@ -184,7 +191,7 @@ export function MemberDialog({
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          <FormField label="Département">
+          <FormField label={term.departmentLabel}>
             <input
               className="field w-full px-3 py-2 text-sm"
               list="member-departments"
@@ -251,6 +258,38 @@ export function MemberDialog({
             ))}
           </select>
         </FormField>
+
+        {/* Temporary-access window (visitors, contractors, exchange students) */}
+        <div className="rounded-xl border border-border bg-surface-2/20 p-3.5">
+          <p className="mb-2.5 flex items-center gap-1.5 text-xs font-medium text-text">
+            <CalendarRange className="h-3.5 w-3.5 text-accent" />
+            Accès temporaire (optionnel)
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <FormField label="Valable du">
+              <input
+                type="date"
+                className="field tnum w-full px-3 py-2 text-sm"
+                value={form.valid_from}
+                max={form.valid_until || undefined}
+                onChange={(e) => set("valid_from", e.target.value)}
+              />
+            </FormField>
+            <FormField label="Jusqu'au">
+              <input
+                type="date"
+                className="field tnum w-full px-3 py-2 text-sm"
+                value={form.valid_until}
+                min={form.valid_from || undefined}
+                onChange={(e) => set("valid_until", e.target.value)}
+              />
+            </FormField>
+          </div>
+          <p className="mt-1.5 text-xs text-text-muted/80">
+            Hors fenêtre, l&apos;accès est refusé (motif « expiré »). Laissez vide pour un accès
+            permanent.
+          </p>
+        </div>
 
         <FormError message={error} />
       </div>

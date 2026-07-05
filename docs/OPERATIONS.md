@@ -20,7 +20,7 @@ TOKEN=$(curl -s $API/api/auth/login \
 
 ## 1. Enrol a person from one photo
 
-**One clear, front-facing photo is all it takes.** It creates the CompreFace subject and
+**One clear, front-facing photo is all it takes.** It creates the engine subject and
 the face embedding in a single call, and the person is recognisable immediately.
 
 **In the Console**
@@ -248,3 +248,180 @@ A reception/security checklist for a normal day.
 | Someone left the company still has access  | Set member `status = suspended` or `archived`.                      |
 | Attendance shows `incomplete` a lot        | A monitored exit door is missing — add an `out` door/camera.        |
 | Wrong people marked `late`                 | Adjust the site's `workday_start` / `grace_minutes`.                |
+| Visitor denied with "Accès expiré"         | Their `valid_until` has passed — extend the window (§13) if intended.|
+
+---
+
+## 8. Read the reports (trends, not just today)
+
+The dashboard answers *today*; the **Reports** section answers *this month*. Three views,
+all over a `from`/`to` date range:
+
+- **Summary** — averages across the range: present / late / absent per day,
+  **punctuality rate**, average worked hours, and a day-by-day series for the trend
+  chart. Use it for the monthly management snapshot.
+- **By department** (or **by faculté** in campus mode) — present/late/absent days and
+  average worked hours per department. This is where a chronically late team (or a
+  faculty with an amphitheatre attendance problem) shows up.
+- **By member** — per-person totals: present/late/absent days, average arrival time,
+  total worked hours. Sort by `late`, `hours`, or `absences` to find the outliers.
+
+**In the Console** — Reports → pick the range → switch between the three tabs →
+**Export CSV** for the per-member aggregate.
+
+**Via the API**
+
+```bash
+curl -s "$API/api/reports/summary?from=2026-06-01&to=2026-06-30" -H "Authorization: Bearer $TOKEN"
+curl -s "$API/api/reports/departments?from=2026-06-01&to=2026-06-30" -H "Authorization: Bearer $TOKEN"
+curl -s "$API/api/reports/members?from=2026-06-01&to=2026-06-30&sort=late&limit=20" \
+  -H "Authorization: Bearer $TOKEN"
+curl -s "$API/api/reports/export.csv?from=2026-06-01&to=2026-06-30" \
+  -H "Authorization: Bearer $TOKEN" -o report-june.csv
+```
+
+---
+
+## 9. Muster / evacuation list — who is inside right now
+
+For a fire drill, a real evacuation, or a safety head-count: `GET /api/presence/now`
+returns everyone whose day has a first entry and no later exit — i.e. **the people
+believed to be on-site at this moment**, with name, department, entry time, and the
+door they came in by.
+
+**In the Console** — Presence (on-site now) → the live list, plus a **print-ready
+muster view** to take to the assembly point.
+
+**Via the API**
+
+```bash
+curl -s "$API/api/presence/now" -H "Authorization: Bearer $TOKEN"
+# → { "count": 42, "people": [ { member_name, department, first_in_ts, first_in_door_name, … } ] }
+```
+
+> Honest limit: the list is only as good as your exit coverage. If people can leave
+> through an unmonitored door, they stay on the list until midnight. For a reliable
+> muster, monitor the exits (`direction: "out"`) as well as the entrances.
+
+---
+
+## 10. Acknowledge alerts
+
+Every non-granted decision (unknown face, not authorized, off schedule) automatically
+creates an **alert**. The Console shows an unacknowledged-count badge and streams new
+alerts live; acknowledging records **who** cleared it and **when** — so night-shift
+denials are provably reviewed, not silently scrolled past.
+
+**In the Console** — Alerts → review the list (filter by kind / acknowledged) →
+**Acknowledge** one, or **Acknowledge all** after review.
+
+**Via the API**
+
+```bash
+curl -s "$API/api/alerts?acknowledged=false&limit=50" -H "Authorization: Bearer $TOKEN"
+curl -s "$API/api/alerts/count" -H "Authorization: Bearer $TOKEN"   # → { "unacknowledged": n }
+curl -s -X POST "$API/api/alerts/123/ack" -H "Authorization: Bearer $TOKEN"
+curl -s -X POST "$API/api/alerts/ack-all" -H "Authorization: Bearer $TOKEN"
+```
+
+Add "review and acknowledge alerts" to the morning routine (§7): repeated
+`unknown_face` at one door overnight is either a lighting problem or a person to show
+security.
+
+---
+
+## 11. Team roles — admin, operator, viewer
+
+Console operators are accounts with a **role**; give each person the least they need:
+
+| Role       | Can do                                                                        |
+|------------|-------------------------------------------------------------------------------|
+| `viewer`   | Read-only: dashboard, attendance, reports, live monitor. Reception screens.   |
+| `operator` | Viewer + day-to-day writes: enrol members, acknowledge alerts, import CSV.    |
+| `admin`    | Everything: doors, cameras, access groups, settings/branding, **team accounts**, audit log. |
+
+**In the Console** (admin) — Settings → Team → add / edit / remove accounts.
+
+**Via the API** (admin)
+
+```bash
+curl -s -X POST $API/api/users \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"email":"reception@example.com","full_name":"Reception","role":"viewer","password":"<strong>"}'
+```
+
+Safety rails: you cannot delete your own account, and you cannot delete the **last
+admin** — the API refuses with `409`. Every team change is written to the audit log.
+
+---
+
+## 12. Bulk import members (CSV)
+
+Onboard a whole department — or a whole rentrée of students — in one upload. The CSV
+creates members **without photos**; enrol each face afterwards (§1) at your own pace.
+
+**CSV format** (UTF-8, header row required, exactly these columns):
+
+```csv
+full_name,external_id,member_type,department,title,email,phone,valid_from,valid_until
+Yassine El Amrani,EMP-0412,employee,Finance,Comptable,y.elamrani@example.com,+2126xxxxxxxx,,
+Sara Lahlou,ST-2026-118,student,Faculté des Sciences,,s.lahlou@example.edu,,2026-09-01,2027-06-30
+```
+
+- `full_name` is required; everything else may be empty.
+- `member_type` ∈ `employee | resident | contractor | visitor | student | faculty | staff`.
+- `valid_from` / `valid_until` are ISO dates (`YYYY-MM-DD`) — leave empty for permanent access.
+- Rows whose `external_id` already exists are **skipped**, so re-running an import is safe.
+
+**In the Console** — People → **Import CSV** → drop the file → review the result
+(`created` / `skipped` / per-line errors).
+
+**Via the API**
+
+```bash
+curl -s -X POST $API/api/members/import \
+  -H "Authorization: Bearer $TOKEN" -F 'file=@students.csv'
+# → { "created": 214, "skipped": 3, "errors": [ { "line": 17, "message": "…" } ] }
+```
+
+---
+
+## 13. Temporary access windows (visitors, contractors, exchange students)
+
+Give someone access that **expires by itself** — no calendar reminder, no forgotten
+badge to chase. Set `valid_from` / `valid_until` on the member; outside the window a
+recognised face is denied with reason `expired` (or `not_yet_valid`), and the Gate
+shows a polite localized line ("Accès expiré — contactez l'accueil").
+
+**In the Console** — People → the member → set the **validity window** dates. Clear
+them to restore permanent access.
+
+**Via the API**
+
+```bash
+curl -s -X PATCH $API/api/members/<member-uuid> \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"valid_from":"2026-09-01","valid_until":"2026-12-20"}'
+```
+
+Typical uses: a contractor on a 3-month job, a semester's exchange student, a
+*vacataire* teaching one term, a visitor badge-for-a-day. Combine with a time-boxed
+access group (weekday daytime only) for both a **date** bound and an **hour** bound.
+
+---
+
+## 14. Campus terminology (universities)
+
+One setting relabels the whole product for a campus:
+`branding.terminology = "campus"` (admin → Settings → Branding, or `PUT /api/settings`).
+
+- The Console and Gate speak **Étudiants & Personnel** and **Faculté / École** instead
+  of employees and departments.
+- The `student` / `faculty` / `staff` member types surface first in forms and filters.
+- Reports group by faculté; attendance semantics are unchanged (first-in / last-out).
+
+Pair it with §12 (bulk-import the rentrée list), §13 (exchange students and
+vacataires expire automatically), and per-building access groups with schedules
+(labs and the bibliothèque on their own doors and hours). The presets are
+`workforce` (default), `campus`, and `residence` — the API stores the preset; the
+labels live in the UI's i18n layer.

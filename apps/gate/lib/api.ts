@@ -150,6 +150,7 @@ export function toKioskResult(r: RecognizeResult): KioskResult {
     similarity: r.similarity,
     doorOpened: Boolean(r.door_opened),
     greeting: r.greeting,
+    reason: r.reason,
     at: new Date(),
   };
 }

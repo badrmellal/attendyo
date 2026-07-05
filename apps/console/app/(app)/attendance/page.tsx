@@ -36,7 +36,7 @@ import { cn, formatDuration, formatTime, shiftDate, todayISO } from "@/lib/utils
 type RangeMode = "day" | "range";
 
 export default function AttendancePage() {
-  const { branding } = useBranding();
+  const { branding, term } = useBranding();
   const [mode, setMode] = useState<RangeMode>("day");
   const [date, setDate] = useState(todayISO());
   const [from, setFrom] = useState(shiftDate(todayISO(), -6));
@@ -95,7 +95,7 @@ export default function AttendancePage() {
     },
     {
       key: "department",
-      header: "Département",
+      header: term.departmentLabel,
       cell: (r) => <span className="text-sm text-text-muted">{r.department || "—"}</span>,
     },
     ...(mode === "range"

@@ -1,6 +1,10 @@
 # ===========================================================================
 # LIWAN API — FastAPI backend.
 # Slim CPU-only image. No GPU, no cloud dependencies. Runs on any x86/ARM box.
+#
+# Build context is the REPO ROOT (see docker-compose.yml) so the image can
+# bundle db/schema.sql + db/migrations/ for self-healing startup migrations:
+#   docker build -f services/api/Dockerfile .
 # ===========================================================================
 FROM python:3.12-slim
 
@@ -17,14 +21,16 @@ ENV PYTHONUNBUFFERED=1 \
 WORKDIR /app
 
 # Install dependencies first for layer caching.
-COPY requirements.txt /app/requirements.txt
+COPY services/api/requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt
 
 # Application code.
-COPY app /app/app
+COPY services/api/app /app/app
 
-# Schema + seed script are mounted/copied from the repo root at runtime when
-# available; the schema is also auto-applied on startup if reachable on disk.
+# Database schema + idempotent migrations, baked into the image so the API can
+# self-heal the schema on startup even when the Postgres init script never ran.
+COPY db /app/db
+
 # Media lives on a volume.
 RUN mkdir -p /data/media
 

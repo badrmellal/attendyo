@@ -72,7 +72,7 @@ Edit `.env` and change **every** secret before the box touches a real network:
 | `LIWAN_JWT_SECRET`     | Signs operator sessions. Use a long random string (32+ chars).     |
 | `LIWAN_ADMIN_PASSWORD` | First admin login. Change here and again in Console → Settings.     |
 | `LIWAN_DEVICE_KEY`     | Shared secret every Gate/Bridge presents as `X-Device-Key`.         |
-| `COMPREFACE_API_KEY`   | Filled in step 4 after you create the Recognition service.          |
+| `ENGINE_API_KEY`       | Filled in step 4 — `scripts/provision_engine.py` writes it for you. |
 
 Generate strong secrets, for example:
 
@@ -86,22 +86,29 @@ docker compose up -d
 
 # 3) Watch it become healthy.
 docker compose ps
-curl -s http://localhost:8088/health      # → {"status":"ok","compreface":"...","db":"..."}
-```
-
-```text
-# 4) Create the recognition key (one time).
-#    Open the CompreFace admin UI in a browser:
-http://<server-ip>:8000
-#    → create an application → add a service of type "Recognition"
-#    → copy the generated API key.
+curl -s http://localhost:8088/health      # engine + DB status must be "ok"
 ```
 
 ```bash
-#    Paste it into .env:
-#      COMPREFACE_API_KEY=<the-key-you-copied>
+# 4) Provision the vision engine (one command, one time).
+#    Registers the engine admin account, creates the application and its
+#    Recognition service, prints the API key, and writes it into .env:
+python scripts/provision_engine.py \
+  --email admin@example.com --password 'a-strong-password' --write-env
 #    Then restart the API so it picks up the key:
 docker compose up -d liwan-api
+```
+
+```text
+#    Fallback (if the script cannot complete on your engine version):
+#    open the engine console in a browser:
+http://<server-ip>:8000
+#    → create an application → add a service of type "Recognition"
+#    → copy the generated API key → paste it into .env as ENGINE_API_KEY
+#    → docker compose up -d liwan-api
+```
+
+```bash
 
 # 5) Seed a demo site, doors, an access group and a few members (optional).
 python scripts/seed_demo.py
@@ -139,7 +146,7 @@ Expose only what each audience needs; keep the rest internal to the Docker netwo
 | 3000 | operator workstations  | Console. Restrict to admin/HR subnet if possible.                 |
 | 3001 | door tablets           | Gate. Restrict to the door-tablet VLAN.                           |
 | 8088 | apps, tablets, Bridge  | Liwan API. LAN only.                                              |
-| 8000 | installer, briefly     | CompreFace admin UI. Close after setup, or restrict to admins.    |
+| 8000 | installer, briefly     | Engine console. Close after setup, or restrict to admins.         |
 | 5432 | nobody                 | Postgres. **Keep internal** to the Docker network — do not publish.|
 
 Recommended host firewall (ufw example, adjust subnets):
@@ -169,7 +176,7 @@ operator logins and tokens travel encrypted even inside the building.
 What to back up and how. All of it is local.
 
 - **PostgreSQL** — the system of record (members, events, attendance, settings, the
-  CompreFace subjects/embeddings). A nightly dump:
+  engine's subjects/embeddings). A nightly dump:
 
   ```bash
   docker exec liwan-postgres-db \
@@ -217,7 +224,7 @@ telemetry.
 
 ## 8. Upgrades
 
-- Pin the CompreFace engine versions in `.env` (`*_VERSION`) so upgrades are deliberate.
+- Pin the vision-engine versions in `.env` (`*_VERSION`) so upgrades are deliberate.
 - Before upgrading: back up Postgres and the media volume (§6).
 - Pull the new Liwan bundle / images, then `docker compose up -d` to roll forward.
 - The schema is idempotent (`CREATE TABLE IF NOT EXISTS …`, seeds use `ON CONFLICT DO
@@ -229,10 +236,10 @@ telemetry.
 
 | Symptom                                   | Check                                                                 |
 |-------------------------------------------|-----------------------------------------------------------------------|
-| `/health` shows `compreface: "down"`      | `docker compose ps`; the core/api containers; CPU/RAM pressure.       |
+| `/health` shows the engine `"down"`       | `docker compose ps`; the engine core/api containers; CPU/RAM pressure.|
 | `/health` shows `db: "down"`              | Postgres container up? Volume mounted? Disk full?                     |
-| Recognition always `unknown_face`         | Is `COMPREFACE_API_KEY` set and the API restarted? Lower the camera's `recognition_threshold` slightly; check lighting. |
+| Recognition always `unknown_face`         | Is `ENGINE_API_KEY` set and the API restarted? Lower the camera's `recognition_threshold` slightly; check lighting. |
 | Gate can't open camera                    | Browser camera permission; HTTPS may be required by the browser for webcam — use the LAN TLS proxy (§5). |
 | Door never actuates on `granted`          | Driver config; use the door **test pulse**; see [`DOOR-INTEGRATION.md`](DOOR-INTEGRATION.md). |
 
-Logs: `docker compose logs -f liwan-api` (and `liwan-compreface-core` for recognition).
+Logs: `docker compose logs -f liwan-api` (and `liwan-engine-core` for recognition).

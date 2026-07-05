@@ -10,41 +10,76 @@
 import type {
   AccessEvent,
   AccessGroup,
+  AccessGroupDraft,
+  Alert,
+  AlertQuery,
   AttendanceDay,
+  AuditEntry,
+  AuditQuery,
   AuthUser,
   Camera,
   CameraDraft,
+  DepartmentReport,
   Door,
   DoorDraft,
   HealthStatus,
+  ImportError,
+  ImportResult,
   LoginResponse,
   Member,
   MemberDraft,
+  MemberPatch,
   MemberQuery,
+  MemberReport,
+  MemberType,
+  OperatorUser,
+  PresenceNow,
+  ReportSort,
+  ReportsSummary,
   Settings,
   TodayStats,
+  UserDraft,
+  UserPatch,
 } from "./types";
 import {
-  MOCK_ATTENDANCE,
   MOCK_EVENTS,
+  mockAttendanceFor,
+  ackAllMockAlerts,
+  ackMockAlert,
+  addMockAccessGroup,
   addMockCamera,
   addMockDoor,
   addMockMember,
+  addMockUser,
+  appendMockAudit,
+  deleteMockAccessGroup,
   deleteMockCamera,
   deleteMockDoor,
   deleteMockMember,
+  deleteMockUser,
   getMockAccessGroups,
+  getMockAlertCount,
+  getMockAlerts,
+  getMockAudit,
   getMockCameras,
   getMockDoors,
   getMockMembers,
   getMockSettings,
+  getMockUsers,
   mockId,
+  mockPresenceNow,
+  mockReportsDepartments,
+  mockReportsMembers,
+  mockReportsSummary,
   mockTodayStats,
   nextLiveEvent,
   putMockSettings,
+  recordMockAlert,
+  updateMockAccessGroup,
   updateMockCamera,
   updateMockDoor,
   updateMockMember,
+  updateMockUser,
 } from "./mock";
 import { hoursDecimal, todayISO } from "./utils";
 
@@ -255,6 +290,8 @@ export async function enrollMember(draft: MemberDraft, image: Blob): Promise<Mem
         phone: draft.phone,
         access_group_id: draft.access_group_id,
         photo_url: photoUrl,
+        valid_from: draft.valid_from,
+        valid_until: draft.valid_until,
         status: "active",
         created_at: new Date().toISOString(),
       };
@@ -263,7 +300,7 @@ export async function enrollMember(draft: MemberDraft, image: Blob): Promise<Mem
   );
 }
 
-export async function updateMember(id: string, patch: Partial<Member>): Promise<Member> {
+export async function updateMember(id: string, patch: MemberPatch): Promise<Member> {
   return withMock(
     () =>
       request<Member>(`/api/members/${id}`, {
@@ -274,7 +311,15 @@ export async function updateMember(id: string, patch: Partial<Member>): Promise<
     async () => {
       await delay(350);
       try {
-        return updateMockMember(id, patch);
+        // Explicit nulls clear the validity window in the mock store too.
+        const normalized: Partial<Member> = {
+          ...patch,
+          valid_from: patch.valid_from ?? undefined,
+          valid_until: patch.valid_until ?? undefined,
+        };
+        if (!("valid_from" in patch)) delete normalized.valid_from;
+        if (!("valid_until" in patch)) delete normalized.valid_until;
+        return updateMockMember(id, normalized);
       } catch {
         throw new ApiError(404, "Member not found");
       }
@@ -287,20 +332,74 @@ export async function deleteMember(id: string): Promise<void> {
     () => request<void>(`/api/members/${id}`, { method: "DELETE" }),
     async () => {
       await delay(300);
-      // Server-side this also removes the CompreFace subject; the UI just deletes.
+      // Server-side this also removes the vision-engine subject; the UI just deletes.
       deleteMockMember(id);
     },
   );
 }
 
 // --------------------------------------------------------------------------
-// Access groups — used to populate the member access-group selector.
-// CONTRACT.md references `access_group_id` on Member; the list is read-only here.
+// Access groups — full CRUD (`/api/access-groups`).
+// `door_ids` empty ⇒ all doors; `schedule` {} ⇒ any time.
 // --------------------------------------------------------------------------
 export async function listAccessGroups(): Promise<AccessGroup[]> {
   return withMock(
     () => request<AccessGroup[]>("/api/access-groups"),
     () => getMockAccessGroups(),
+  );
+}
+
+export async function createAccessGroup(draft: AccessGroupDraft): Promise<AccessGroup> {
+  return withMock(
+    () =>
+      request<AccessGroup>("/api/access-groups", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(draft),
+      }),
+    async () => {
+      await delay(400);
+      const group = addMockAccessGroup(draft);
+      appendMockAudit("access_group.create", "access_group", group.id, { name: group.name });
+      return group;
+    },
+  );
+}
+
+export async function updateAccessGroup(
+  id: string,
+  patch: Partial<AccessGroupDraft>,
+): Promise<AccessGroup> {
+  return withMock(
+    () =>
+      request<AccessGroup>(`/api/access-groups/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      }),
+    async () => {
+      await delay(350);
+      try {
+        const group = updateMockAccessGroup(id, patch);
+        appendMockAudit("access_group.update", "access_group", id, {
+          changed: Object.keys(patch),
+        });
+        return group;
+      } catch {
+        throw new ApiError(404, "Access group not found");
+      }
+    },
+  );
+}
+
+export async function deleteAccessGroup(id: string): Promise<void> {
+  return withMock(
+    () => request<void>(`/api/access-groups/${id}`, { method: "DELETE" }),
+    async () => {
+      await delay(300);
+      deleteMockAccessGroup(id);
+      appendMockAudit("access_group.delete", "access_group", id);
+    },
   );
 }
 
@@ -318,16 +417,22 @@ export async function getAttendance(
   const query = qs.toString();
   return withMock(
     () => request<AttendanceDay[]>(`/api/attendance${query ? `?${query}` : ""}`),
-    () => MOCK_ATTENDANCE,
+    () => mockAttendanceFor(params),
   );
 }
 
-/** Build the export.csv URL (the page can also just navigate to it). */
+/**
+ * Build the export.csv URL (the page can also just navigate to it). Direct
+ * downloads can't carry an Authorization header, so the operator JWT rides as
+ * the contract-blessed `?token=` query param.
+ */
 export function attendanceExportUrl(params: { date?: string; from?: string; to?: string }): string {
   const qs = new URLSearchParams();
   if (params.date) qs.set("date", params.date);
   if (params.from) qs.set("from", params.from);
   if (params.to) qs.set("to", params.to);
+  const token = getToken();
+  if (token) qs.set("token", token);
   return `${API_URL}/api/attendance/export.csv${qs.toString() ? `?${qs.toString()}` : ""}`;
 }
 
@@ -389,39 +494,85 @@ export async function listEvents(
   );
 }
 
+type StreamOpts = {
+  onStatus?: (live: boolean) => void;
+  /** Fired for SSE `event: alert` frames (v2). */
+  onAlert?: (alert: Alert) => void;
+};
+
+type MockStreamListener = {
+  onEvent: (event: AccessEvent) => void;
+  onAlert?: (alert: Alert) => void;
+};
+
+// Single shared mock ticker: every subscriber (dashboard feed, monitor wall,
+// alert bell…) sees the SAME synthetic events, exactly like a real SSE fan-out.
+// Non-granted events are also persisted as alerts so /alerts and the badge
+// stay consistent with the stream.
+const mockStreamListeners = new Set<MockStreamListener>();
+let mockStreamTimer: ReturnType<typeof setInterval> | null = null;
+
+function subscribeMockStream(listener: MockStreamListener): () => void {
+  mockStreamListeners.add(listener);
+  if (!mockStreamTimer) {
+    mockStreamTimer = setInterval(() => {
+      const event = nextLiveEvent();
+      const alert = event.decision !== "granted" ? recordMockAlert(event) : null;
+      mockStreamListeners.forEach((l) => {
+        l.onEvent(event);
+        if (alert) l.onAlert?.(alert);
+      });
+    }, 3200);
+  }
+  return () => {
+    mockStreamListeners.delete(listener);
+    if (mockStreamListeners.size === 0 && mockStreamTimer) {
+      clearInterval(mockStreamTimer);
+      mockStreamTimer = null;
+    }
+  };
+}
+
 /**
- * Subscribe to the live access feed (`GET /api/events/stream`, SSE).
+ * Subscribe to the live feed (`GET /api/events/stream`, SSE).
  *
- * Returns an unsubscribe function. When mock is active or the real stream is
- * unreachable, it emits synthetic events on an interval so the UI stays alive.
+ * The stream emits two NAMED event types: `access` (every decision) and
+ * `alert` (v2 — persisted, acknowledgeable notifications). Returns an
+ * unsubscribe function. When mock is active or the real stream is unreachable,
+ * a shared synthetic ticker keeps every subscriber alive and consistent.
  */
 export function streamEvents(
   onEvent: (event: AccessEvent) => void,
-  opts: { onStatus?: (live: boolean) => void } = {},
+  opts: StreamOpts = {},
 ): () => void {
   let closed = false;
   let source: EventSource | null = null;
-  let timer: ReturnType<typeof setInterval> | null = null;
+  let unsubMock: (() => void) | null = null;
 
   const startMock = () => {
     opts.onStatus?.(false);
-    timer = setInterval(() => {
-      if (!closed) onEvent(nextLiveEvent());
-    }, 3200);
+    unsubMock = subscribeMockStream({ onEvent, onAlert: opts.onAlert });
   };
 
   if (FORCE_MOCK || typeof EventSource === "undefined") {
     startMock();
   } else {
     try {
-      // The browser EventSource can't set Authorization headers, so the API is
-      // expected to accept the token as a query param on the stream endpoint.
+      // The browser EventSource can't set Authorization headers, so the API
+      // accepts the JWT as the contract-blessed `?token=` query param.
       const token = getToken();
-      const url = `${API_URL}/api/events/stream${token ? `?access_token=${encodeURIComponent(token)}` : ""}`;
+      const url = `${API_URL}/api/events/stream${token ? `?token=${encodeURIComponent(token)}` : ""}`;
       source = new EventSource(url);
       source.addEventListener("access", (ev) => {
         try {
           onEvent(JSON.parse((ev as MessageEvent).data) as AccessEvent);
+        } catch {
+          /* ignore malformed frame */
+        }
+      });
+      source.addEventListener("alert", (ev) => {
+        try {
+          opts.onAlert?.(JSON.parse((ev as MessageEvent).data) as Alert);
         } catch {
           /* ignore malformed frame */
         }
@@ -433,7 +584,7 @@ export function streamEvents(
           source.close();
           source = null;
         }
-        if (!closed && !timer) startMock();
+        if (!closed && !unsubMock) startMock();
       };
     } catch {
       startMock();
@@ -443,7 +594,7 @@ export function streamEvents(
   return () => {
     closed = true;
     if (source) source.close();
-    if (timer) clearInterval(timer);
+    if (unsubMock) unsubMock();
   };
 }
 
@@ -608,13 +759,413 @@ export async function putSettings(settings: Settings): Promise<Settings> {
   );
 }
 
+// ==========================================================================
+// v2 endpoints
+// ==========================================================================
+
+// --------------------------------------------------------------------------
+// Reports & analytics (`/api/reports/*`, operator+)
+// --------------------------------------------------------------------------
+export async function getReportsSummary(from: string, to: string): Promise<ReportsSummary> {
+  return withMock(
+    () => request<ReportsSummary>(`/api/reports/summary?from=${from}&to=${to}`),
+    () => mockReportsSummary(from, to),
+  );
+}
+
+export async function getReportsDepartments(
+  from: string,
+  to: string,
+): Promise<DepartmentReport[]> {
+  return withMock(
+    () => request<DepartmentReport[]>(`/api/reports/departments?from=${from}&to=${to}`),
+    () => mockReportsDepartments(from, to),
+  );
+}
+
+export async function getReportsMembers(
+  from: string,
+  to: string,
+  sort: ReportSort = "late",
+  limit = 15,
+): Promise<MemberReport[]> {
+  return withMock(
+    () =>
+      request<MemberReport[]>(
+        `/api/reports/members?from=${from}&to=${to}&sort=${sort}&limit=${limit}`,
+      ),
+    () => mockReportsMembers(from, to, sort, limit),
+  );
+}
+
+/**
+ * `GET /api/reports/export.csv?from&to` — per-member aggregate CSV. Direct
+ * downloads can't carry an Authorization header, so the operator JWT rides as
+ * the contract-blessed `?token=` query param.
+ */
+export function reportsExportUrl(from: string, to: string): string {
+  const qs = new URLSearchParams({ from, to });
+  const token = getToken();
+  if (token) qs.set("token", token);
+  return `${API_URL}/api/reports/export.csv?${qs.toString()}`;
+}
+
+/** Build the per-member aggregate CSV locally — used for the mock download. */
+export function memberReportToCSV(rows: MemberReport[]): string {
+  const header = [
+    "member_id",
+    "member_name",
+    "department",
+    "present_days",
+    "late_days",
+    "absent_days",
+    "avg_arrival",
+    "total_hours",
+  ];
+  const lines = rows.map((r) =>
+    [
+      r.member_id,
+      r.member_name,
+      r.department ?? "",
+      r.present_days,
+      r.late_days,
+      r.absent_days,
+      r.avg_arrival ?? "",
+      hoursDecimal(r.total_worked_seconds),
+    ]
+      .map((cell) => {
+        const s = String(cell);
+        return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+      })
+      .join(","),
+  );
+  return [header.join(","), ...lines].join("\n");
+}
+
+// --------------------------------------------------------------------------
+// Presence / muster (`GET /api/presence/now`, operator+)
+// --------------------------------------------------------------------------
+export async function getPresenceNow(): Promise<PresenceNow> {
+  return withMock(
+    () => request<PresenceNow>("/api/presence/now"),
+    () => mockPresenceNow(),
+  );
+}
+
+// --------------------------------------------------------------------------
+// Alerts (`/api/alerts`, operator+ to ack)
+// --------------------------------------------------------------------------
+export async function listAlerts(query: AlertQuery = {}): Promise<Alert[]> {
+  const qs = new URLSearchParams();
+  if (query.acknowledged !== undefined) qs.set("acknowledged", String(query.acknowledged));
+  if (query.kind) qs.set("kind", query.kind);
+  if (query.limit) qs.set("limit", String(query.limit));
+  const q = qs.toString();
+  return withMock(
+    () => request<Alert[]>(`/api/alerts${q ? `?${q}` : ""}`),
+    () => getMockAlerts(query),
+  );
+}
+
+export async function getAlertCount(): Promise<{ unacknowledged: number }> {
+  return withMock(
+    () => request<{ unacknowledged: number }>("/api/alerts/count"),
+    () => getMockAlertCount(),
+  );
+}
+
+export async function ackAlert(id: number): Promise<Alert> {
+  return withMock(
+    () => request<Alert>(`/api/alerts/${id}/ack`, { method: "POST" }),
+    async () => {
+      await delay(250);
+      try {
+        return ackMockAlert(id);
+      } catch {
+        throw new ApiError(404, "Alert not found");
+      }
+    },
+  );
+}
+
+export async function ackAllAlerts(): Promise<{ acknowledged: number }> {
+  return withMock(
+    () => request<{ acknowledged: number }>("/api/alerts/ack-all", { method: "POST" }),
+    async () => {
+      await delay(350);
+      return ackAllMockAlerts();
+    },
+  );
+}
+
+/**
+ * Cross-component "alerts changed" signal so the TopBar bell refreshes after an
+ * ack anywhere in the app (and after live alert arrivals).
+ */
+export const ALERTS_CHANGED_EVENT = "liwan:alerts-changed";
+
+export function notifyAlertsChanged() {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(ALERTS_CHANGED_EVENT));
+  }
+}
+
+// --------------------------------------------------------------------------
+// Audit log (`GET /api/audit`, admin only)
+// --------------------------------------------------------------------------
+export async function listAudit(query: AuditQuery = {}): Promise<AuditEntry[]> {
+  const qs = new URLSearchParams();
+  if (query.limit) qs.set("limit", String(query.limit));
+  if (query.action) qs.set("action", query.action);
+  if (query.user) qs.set("user", query.user);
+  const q = qs.toString();
+  return withMock(
+    () => request<AuditEntry[]>(`/api/audit${q ? `?${q}` : ""}`),
+    () => getMockAudit(query),
+  );
+}
+
+// --------------------------------------------------------------------------
+// Team / operator users (`/api/users`, admin only)
+// --------------------------------------------------------------------------
+export async function listUsers(): Promise<OperatorUser[]> {
+  return withMock(
+    () => request<OperatorUser[]>("/api/users"),
+    () => getMockUsers(),
+  );
+}
+
+export async function createUser(draft: UserDraft): Promise<OperatorUser> {
+  return withMock(
+    () =>
+      request<OperatorUser>("/api/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(draft),
+      }),
+    async () => {
+      await delay(400);
+      try {
+        return addMockUser(draft);
+      } catch (err) {
+        throw new ApiError(409, err instanceof Error ? err.message : "Conflit");
+      }
+    },
+  );
+}
+
+export async function updateUser(id: string, patch: UserPatch): Promise<OperatorUser> {
+  return withMock(
+    () =>
+      request<OperatorUser>(`/api/users/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      }),
+    async () => {
+      await delay(350);
+      try {
+        return updateMockUser(id, patch);
+      } catch {
+        throw new ApiError(404, "User not found");
+      }
+    },
+  );
+}
+
+/** DELETE /api/users/{id} — the API refuses self-delete and last-admin (409). */
+export async function deleteUser(id: string): Promise<void> {
+  return withMock(
+    () => request<void>(`/api/users/${id}`, { method: "DELETE" }),
+    async () => {
+      await delay(300);
+      try {
+        deleteMockUser(id);
+      } catch (err) {
+        throw new ApiError(409, err instanceof Error ? err.message : "Conflit");
+      }
+    },
+  );
+}
+
+// --------------------------------------------------------------------------
+// Bulk CSV import (`POST /api/members/import`, operator+)
+// --------------------------------------------------------------------------
+
+/** Canonical CSV header, straight from CONTRACT.md. */
+export const IMPORT_CSV_COLUMNS = [
+  "full_name",
+  "external_id",
+  "member_type",
+  "department",
+  "title",
+  "email",
+  "phone",
+  "valid_from",
+  "valid_until",
+] as const;
+
+const IMPORT_MEMBER_TYPES: MemberType[] = [
+  "employee",
+  "resident",
+  "contractor",
+  "visitor",
+  "student",
+  "faculty",
+  "staff",
+];
+
+/** Minimal RFC-4180-ish line splitter (handles quoted cells + escaped quotes). */
+function splitCsvLine(line: string): string[] {
+  const cells: string[] = [];
+  let cur = "";
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (line[i + 1] === '"') {
+          cur += '"';
+          i++;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        cur += ch;
+      }
+    } else if (ch === '"') {
+      inQuotes = true;
+    } else if (ch === ",") {
+      cells.push(cur);
+      cur = "";
+    } else {
+      cur += ch;
+    }
+  }
+  cells.push(cur);
+  return cells.map((c) => c.trim());
+}
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Mock-mode importer: parses the actual CSV file client-side and creates the
+ * members (without photos — faces get enrolled later), mirroring the API's
+ * behaviour: rows whose `external_id` already exists are skipped.
+ */
+async function importMembersMock(file: File): Promise<ImportResult> {
+  const text = await file.text();
+  const lines = text.split(/\r\n|\n|\r/).filter((l) => l.trim().length > 0);
+  if (lines.length === 0) {
+    return { created: 0, skipped: 0, errors: [{ line: 1, message: "Fichier vide" }] };
+  }
+
+  const header = splitCsvLine(lines[0]).map((h) => h.toLowerCase());
+  const col = (name: string) => header.indexOf(name);
+  if (col("full_name") === -1) {
+    return {
+      created: 0,
+      skipped: 0,
+      errors: [{ line: 1, message: "Colonne « full_name » manquante dans l'en-tête" }],
+    };
+  }
+
+  const existingIds = new Set(
+    getMockMembers()
+      .map((m) => m.external_id)
+      .filter(Boolean) as string[],
+  );
+
+  let created = 0;
+  let skipped = 0;
+  const errors: ImportError[] = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    const lineNo = i + 1;
+    const cells = splitCsvLine(lines[i]);
+    const get = (name: string) => {
+      const idx = col(name);
+      return idx >= 0 ? cells[idx] || undefined : undefined;
+    };
+
+    const fullName = get("full_name");
+    if (!fullName) {
+      errors.push({ line: lineNo, message: "full_name manquant" });
+      continue;
+    }
+
+    const rawType = get("member_type") || "employee";
+    if (!IMPORT_MEMBER_TYPES.includes(rawType as MemberType)) {
+      errors.push({ line: lineNo, message: `member_type invalide: « ${rawType} »` });
+      continue;
+    }
+
+    const validFrom = get("valid_from");
+    const validUntil = get("valid_until");
+    if (validFrom && !ISO_DATE.test(validFrom)) {
+      errors.push({ line: lineNo, message: "valid_from doit être au format AAAA-MM-JJ" });
+      continue;
+    }
+    if (validUntil && !ISO_DATE.test(validUntil)) {
+      errors.push({ line: lineNo, message: "valid_until doit être au format AAAA-MM-JJ" });
+      continue;
+    }
+
+    const externalId = get("external_id");
+    if (externalId && existingIds.has(externalId)) {
+      skipped++;
+      continue;
+    }
+
+    const id = mockId();
+    addMockMember({
+      id,
+      external_id: externalId,
+      full_name: fullName,
+      member_type: rawType as MemberType,
+      department: get("department"),
+      title: get("title"),
+      email: get("email"),
+      phone: get("phone"),
+      valid_from: validFrom,
+      valid_until: validUntil,
+      status: "active",
+      created_at: new Date().toISOString(),
+    });
+    if (externalId) existingIds.add(externalId);
+    created++;
+  }
+
+  appendMockAudit("member.import", "member", undefined, {
+    created,
+    skipped,
+    errors: errors.length,
+  });
+  return { created, skipped, errors };
+}
+
+/** `POST /api/members/import` (multipart `file`) — creates members WITHOUT photos. */
+export async function importMembersCSV(file: File): Promise<ImportResult> {
+  return withMock(
+    () => {
+      const form = new FormData();
+      form.append("file", file, file.name || "import.csv");
+      return request<ImportResult>("/api/members/import", { method: "POST", body: form });
+    },
+    async () => {
+      await delay(600);
+      return importMembersMock(file);
+    },
+  );
+}
+
 // --------------------------------------------------------------------------
 // Health
 // --------------------------------------------------------------------------
 export async function getHealth(): Promise<HealthStatus> {
   return withMock(
     () => request<HealthStatus>("/health"),
-    () => ({ status: "ok", compreface: "ok", db: "ok" }),
+    () => ({ status: "ok" as const, engine: "ok" as const, db: "ok" as const }),
   );
 }
 

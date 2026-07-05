@@ -5,7 +5,7 @@ where there is **no kiosk browser**. It pulls frames, runs a cheap presence
 gate, and posts candidate frames to the Liwan API recognition endpoint. The API
 does all the decisioning — threshold, access group, schedule, attendance
 roll-up, and firing the door driver. The Bridge never decides access itself and
-never talks to CompreFace or the door hardware directly.
+never talks to the vision engine or the door hardware directly.
 
 ```
 Camera (RTSP/USB) ─► Bridge ─► POST /api/recognize (X-Device-Key) ─► Liwan API

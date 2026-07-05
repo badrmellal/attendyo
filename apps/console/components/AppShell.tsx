@@ -19,8 +19,13 @@ import { cn } from "@/lib/utils";
 function titleKeyForPath(pathname: string): string {
   if (pathname.startsWith("/people")) return "nav.people";
   if (pathname.startsWith("/attendance")) return "nav.attendance";
+  if (pathname.startsWith("/reports")) return "nav.reports";
+  if (pathname.startsWith("/presence")) return "nav.presence";
+  if (pathname.startsWith("/alerts")) return "nav.alerts";
   if (pathname.startsWith("/monitor")) return "nav.monitor";
   if (pathname.startsWith("/doors")) return "nav.doors";
+  if (pathname.startsWith("/groups")) return "nav.groups";
+  if (pathname.startsWith("/team")) return "nav.team";
   if (pathname.startsWith("/settings")) return "nav.settings";
   return "nav.dashboard";
 }
@@ -28,7 +33,7 @@ function titleKeyForPath(pathname: string): string {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { t } = useBranding();
+  const { t, term } = useBranding();
   const [authed, setAuthed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -54,10 +59,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     );
   }
 
+  // People section is relabelled by the terminology preset (campus mode…).
+  const title = pathname.startsWith("/people") ? term.peopleNav : t(titleKeyForPath(pathname));
+
   return (
-    <div className="app-aura flex min-h-screen bg-bg">
+    <div className="app-aura flex min-h-screen bg-bg print:bg-white">
       {/* Desktop sidebar */}
-      <div className="sticky top-0 hidden h-screen shrink-0 md:block">
+      <div className="sticky top-0 hidden h-screen shrink-0 print:hidden md:block">
         <Sidebar />
       </div>
 
@@ -77,8 +85,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* Content */}
       <div className="flex min-w-0 flex-1 flex-col">
-        <TopBar title={t(titleKeyForPath(pathname))} onOpenSidebar={() => setMobileOpen(true)} />
-        <main className={cn("flex-1 px-4 py-6 md:px-8 md:py-8")}>
+        <TopBar title={title} onOpenSidebar={() => setMobileOpen(true)} />
+        <main className={cn("flex-1 px-4 py-6 print:px-0 print:py-0 md:px-8 md:py-8")}>
           <div className="mx-auto w-full max-w-[1400px]">{children}</div>
         </main>
       </div>

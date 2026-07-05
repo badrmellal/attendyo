@@ -12,6 +12,7 @@ import {
   UserPlus,
   Users,
   Filter,
+  FileUp,
   Mail,
   Phone,
   Pencil,
@@ -22,6 +23,7 @@ import {
 import { DataTable, type Column } from "@/components/DataTable";
 import { EnrollDialog } from "@/components/EnrollDialog";
 import { MemberDialog } from "@/components/MemberDialog";
+import { ImportMembersDialog } from "@/components/ImportMembersDialog";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { RowMenu, type RowAction } from "@/components/RowMenu";
 import { EmptyState } from "@/components/EmptyState";
@@ -32,10 +34,12 @@ import {
   deleteMember,
   listAccessGroups,
   listMembers,
+  todayISO,
   updateMember,
 } from "@/lib/api";
+import { memberTypeOptions } from "@/lib/terminology";
 import type { AccessGroup, Member, MemberStatus, MemberType } from "@/lib/types";
-import { cn, humanize } from "@/lib/utils";
+import { cn, formatDate, humanize } from "@/lib/utils";
 
 const STATUS_TONE: Record<MemberStatus, "ok" | "warn" | "muted"> = {
   active: "ok",
@@ -49,15 +53,13 @@ const STATUS_LABEL: Record<MemberStatus, string> = {
   archived: "Archivé",
 };
 
-const TYPE_LABEL: Record<MemberType, string> = {
-  employee: "Employé",
-  resident: "Résident",
-  contractor: "Prestataire",
-  visitor: "Visiteur",
-};
+/** Validity window already over? (valid_until is an inclusive ISO date) */
+function isExpired(m: Member): boolean {
+  return !!m.valid_until && m.valid_until < todayISO();
+}
 
 export default function PeoplePage() {
-  const { t } = useBranding();
+  const { term, branding } = useBranding();
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
@@ -65,6 +67,7 @@ export default function PeoplePage() {
   const [type, setType] = useState<MemberType | "">("");
   const [department, setDepartment] = useState("");
   const [enrollOpen, setEnrollOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [accessGroups, setAccessGroups] = useState<AccessGroup[]>([]);
   const [editing, setEditing] = useState<Member | null>(null);
   const [deleting, setDeleting] = useState<Member | null>(null);
@@ -135,7 +138,7 @@ export default function PeoplePage() {
           <div className="min-w-0">
             <p className="truncate font-medium text-text">{m.full_name}</p>
             <p className="truncate text-xs text-text-muted">
-              {m.title || TYPE_LABEL[m.member_type]}
+              {m.title || term.memberTypeLabels[m.member_type]}
               {m.external_id ? ` · ${m.external_id}` : ""}
             </p>
           </div>
@@ -144,14 +147,14 @@ export default function PeoplePage() {
     },
     {
       key: "department",
-      header: "Département",
+      header: term.departmentLabel,
       cell: (m) => <span className="text-sm text-text-muted">{m.department || "—"}</span>,
     },
     {
       key: "type",
       header: "Type",
       cell: (m) => (
-        <span className="text-sm text-text-muted">{TYPE_LABEL[m.member_type]}</span>
+        <span className="text-sm text-text-muted">{term.memberTypeLabels[m.member_type]}</span>
       ),
     },
     {
@@ -178,7 +181,12 @@ export default function PeoplePage() {
       header: "Statut",
       align: "right",
       cell: (m) => (
-        <div className="flex justify-end">
+        <div className="flex flex-wrap items-center justify-end gap-1.5">
+          {isExpired(m) && (
+            <Pill tone="warn" dot={false}>
+              Expiré {m.valid_until ? `· ${formatDate(m.valid_until, branding.locale)}` : ""}
+            </Pill>
+          )}
           <Pill tone={STATUS_TONE[m.status]}>{STATUS_LABEL[m.status]}</Pill>
         </div>
       ),
@@ -222,21 +230,31 @@ export default function PeoplePage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="font-display text-xl font-semibold tracking-tight text-text">
-            {t("nav.people")}
+            {term.peopleNav}
           </h2>
           <p className="text-sm text-text-muted">
             <span className="tnum font-medium text-text">{filtered.length}</span> sur{" "}
-            <span className="tnum">{members.length}</span> personnes
+            <span className="tnum">{members.length}</span> {term.personPlural}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => setEnrollOpen(true)}
-          className="btn-primary inline-flex items-center justify-center gap-2 px-4 py-2 text-sm"
-        >
-          <UserPlus className="h-4 w-4" />
-          Enregistrer une personne
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setImportOpen(true)}
+            className="btn-ghost inline-flex items-center justify-center gap-2 px-4 py-2 text-sm"
+          >
+            <FileUp className="h-4 w-4" />
+            Importer CSV
+          </button>
+          <button
+            type="button"
+            onClick={() => setEnrollOpen(true)}
+            className="btn-primary inline-flex items-center justify-center gap-2 px-4 py-2 text-sm"
+          >
+            <UserPlus className="h-4 w-4" />
+            Enregistrer une personne
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -271,9 +289,9 @@ export default function PeoplePage() {
             className="field px-3 py-2 text-sm"
           >
             <option value="">Tous types</option>
-            {Object.entries(TYPE_LABEL).map(([v, l]) => (
-              <option key={v} value={v}>
-                {l}
+            {memberTypeOptions(term).map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
               </option>
             ))}
           </select>
@@ -282,7 +300,7 @@ export default function PeoplePage() {
             onChange={(e) => setDepartment(e.target.value)}
             className={cn("field px-3 py-2 text-sm", departments.length === 0 && "hidden")}
           >
-            <option value="">Tous départements</option>
+            <option value="">{term.departmentAll}</option>
             {departments.map((d) => (
               <option key={d} value={d}>
                 {humanize(d)}
@@ -329,6 +347,12 @@ export default function PeoplePage() {
         onEnrolled={(m) => setMembers((prev) => [m, ...prev])}
       />
 
+      <ImportMembersDialog
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onImported={() => refresh()}
+      />
+
       <MemberDialog
         open={editing !== null}
         member={editing}
@@ -350,7 +374,7 @@ export default function PeoplePage() {
           <>
             <p>
               Supprimer <span className="font-medium text-text">{deleting?.full_name}</span> ?
-              Cette action retire aussi le sujet facial associé (CompreFace) et est
+              Cette action retire aussi l&apos;empreinte faciale du moteur de vision et est
               irréversible.
             </p>
           </>

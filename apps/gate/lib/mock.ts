@@ -52,7 +52,7 @@ const PEOPLE: readonly MockPerson[] = [
 type Outcome =
   | { kind: "granted"; direction: Direction }
   | { kind: "unknown_face" }
-  | { kind: "not_authorized" }
+  | { kind: "not_authorized"; reason?: "expired" | "not_yet_valid" }
   | { kind: "off_schedule" };
 
 const OUTCOME_PLAN: readonly Outcome[] = [
@@ -64,8 +64,13 @@ const OUTCOME_PLAN: readonly Outcome[] = [
   { kind: "granted", direction: "out" },
   { kind: "not_authorized" },
   { kind: "granted", direction: "in" },
+  // Validity-window denial (v2): a visitor/contractor whose access has expired.
+  { kind: "not_authorized", reason: "expired" },
   { kind: "granted", direction: "out" },
   { kind: "off_schedule" },
+  // Validity-window denial (v2): access starts in the future (not yet valid).
+  { kind: "not_authorized", reason: "not_yet_valid" },
+  { kind: "granted", direction: "in" },
 ];
 
 let tick = 0;
@@ -128,5 +133,7 @@ export function mockRecognize(): RecognizeResult {
     similarity: randomSimilarity(0.9, 0.98),
     door_opened: false,
     direction: "unknown",
+    // Validity-window denials carry a machine reason the UI localizes.
+    reason: outcome.kind === "not_authorized" ? outcome.reason : undefined,
   };
 }

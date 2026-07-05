@@ -5,7 +5,14 @@
  * contract here; if the API needs a different shape, update CONTRACT.md first.
  */
 
-export type MemberType = "employee" | "resident" | "contractor" | "visitor";
+export type MemberType =
+  | "employee"
+  | "resident"
+  | "contractor"
+  | "visitor"
+  | "student"
+  | "faculty"
+  | "staff";
 export type MemberStatus = "active" | "suspended" | "archived";
 
 export type Member = {
@@ -20,8 +27,22 @@ export type Member = {
   phone?: string;
   access_group_id?: string;
   photo_url?: string;
+  /** ISO date — temporary-access window start (visitors/contractors/exchange). */
+  valid_from?: string;
+  /** ISO date — outside the window → not_authorized, reason "expired". */
+  valid_until?: string;
   status: MemberStatus;
   created_at: string;
+};
+
+/**
+ * PATCH body for `PATCH /api/members/{id}`. Same as Partial<Member> except the
+ * validity window accepts explicit `null` to CLEAR a previously-set bound
+ * (omitting the key leaves it untouched on the server).
+ */
+export type MemberPatch = Omit<Partial<Member>, "valid_from" | "valid_until"> & {
+  valid_from?: string | null;
+  valid_until?: string | null;
 };
 
 export type AccessDirection = "in" | "out" | "unknown";
@@ -111,15 +132,32 @@ export type Camera = {
   created_at: string;
 };
 
+/** Week-day keys used by access-group schedules (liwan/db/schema.sql). */
+export type ScheduleDay = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
+
 /**
- * Access group — which doors a member may open (liwan/db/schema.sql).
- * The Console only needs id + name to populate the member access-group select.
+ * Access-group schedule — per-day optional [start, end] "HH:MM" windows.
+ * `{}` ⇒ any time. A day absent from the object ⇒ closed that day.
+ */
+export type Schedule = Partial<Record<ScheduleDay, [string, string]>>;
+
+/**
+ * Access group — which doors a member may open, and when (liwan/db/schema.sql).
+ * `door_ids` empty ⇒ all doors; `schedule` `{}` ⇒ any time.
  */
 export type AccessGroup = {
   id: string;
   name: string;
-  door_ids?: string[];
+  door_ids: string[];
+  schedule: Schedule;
   created_at?: string;
+};
+
+/** Fields posted to `POST /api/access-groups` (and patched via PATCH). */
+export type AccessGroupDraft = {
+  name: string;
+  door_ids: string[];
+  schedule: Schedule;
 };
 
 /** Fields posted to `POST /api/doors` (and patched via PATCH). */
@@ -146,6 +184,12 @@ export type CameraDraft = {
 /** Branding tokens — `GET /api/settings → branding`. White-label surface. */
 export type Locale = "fr" | "en" | "ar";
 
+/**
+ * Terminology preset — relabels the UI for the customer vertical without a
+ * rebuild. The API stores the preset only; labels live in lib/terminology.ts.
+ */
+export type Terminology = "workforce" | "campus" | "residence";
+
 export type Branding = {
   product_name: string;
   tagline: string;
@@ -153,6 +197,7 @@ export type Branding = {
   accent_color: string;
   logo_url: string | null;
   locale: Locale;
+  terminology: Terminology;
 };
 
 export type AttendanceConfig = {
@@ -172,16 +217,19 @@ export type LoginResponse = {
   token_type: "bearer";
 };
 
+export type OperatorRole = "admin" | "operator" | "viewer";
+
 export type AuthUser = {
   id: string;
   email: string;
   full_name?: string;
-  role: "admin" | "operator" | "viewer";
+  role: OperatorRole;
 };
 
 export type HealthStatus = {
-  status: "ok";
-  compreface: "ok" | "down";
+  /** `degraded` when the DB or the vision engine is unreachable. */
+  status: "ok" | "degraded";
+  engine: "ok" | "down";
   db: "ok" | "down";
 };
 
@@ -203,4 +251,164 @@ export type MemberDraft = {
   email?: string;
   phone?: string;
   access_group_id?: string;
+  valid_from?: string;
+  valid_until?: string;
+};
+
+// ---------------------------------------------------------------------------
+// v2 — Reports & analytics (`GET /api/reports/*`)
+// ---------------------------------------------------------------------------
+
+/** One day of the reports summary chart. */
+export type ReportsDaily = {
+  date: string;
+  present: number;
+  late: number;
+  absent: number;
+};
+
+/** `GET /api/reports/summary?from&to` */
+export type ReportsSummary = {
+  days: number;
+  avg_present: number;
+  avg_late: number;
+  avg_absent: number;
+  /** 0..1 — share of attended days that started on time. */
+  punctuality_rate: number;
+  avg_worked_seconds: number;
+  daily: ReportsDaily[];
+};
+
+/** `GET /api/reports/departments?from&to` — one row per department. */
+export type DepartmentReport = {
+  department: string;
+  members: number;
+  present_days: number;
+  late_days: number;
+  absent_days: number;
+  avg_worked_seconds: number;
+};
+
+/** Sort keys accepted by `GET /api/reports/members`. */
+export type ReportSort = "late" | "hours" | "absences";
+
+/** `GET /api/reports/members?from&to&sort&limit` — one row per member. */
+export type MemberReport = {
+  member_id: string;
+  member_name: string;
+  department?: string;
+  present_days: number;
+  late_days: number;
+  absent_days: number;
+  /** "HH:MM" average first-in, or null when never present. */
+  avg_arrival: string | null;
+  total_worked_seconds: number;
+};
+
+// ---------------------------------------------------------------------------
+// v2 — Presence / muster (`GET /api/presence/now`)
+// ---------------------------------------------------------------------------
+
+export type PresencePerson = {
+  member_id: string;
+  member_name: string;
+  department?: string;
+  member_type: MemberType;
+  first_in_ts: string;
+  first_in_door_name?: string;
+};
+
+export type PresenceNow = {
+  count: number;
+  people: PresencePerson[];
+};
+
+// ---------------------------------------------------------------------------
+// v2 — Alerts (`GET /api/alerts`, SSE `event: alert`)
+// ---------------------------------------------------------------------------
+
+export type AlertKind = "unknown_face" | "not_authorized" | "off_schedule" | "system";
+export type AlertSeverity = "info" | "warning" | "critical";
+
+export type Alert = {
+  id: number;
+  ts: string;
+  kind: AlertKind;
+  severity: AlertSeverity;
+  message: string;
+  event_id?: number;
+  door_id?: string;
+  door_name?: string;
+  member_id?: string;
+  member_name?: string;
+  acknowledged: boolean;
+  acknowledged_by_email?: string;
+  acknowledged_at?: string;
+};
+
+/** Filters accepted by `GET /api/alerts`. */
+export type AlertQuery = {
+  acknowledged?: boolean;
+  kind?: AlertKind;
+  limit?: number;
+};
+
+// ---------------------------------------------------------------------------
+// v2 — Audit log (`GET /api/audit`, admin only, append-only)
+// ---------------------------------------------------------------------------
+
+export type AuditEntry = {
+  id: number;
+  ts: string;
+  user_email?: string;
+  action: string;
+  entity?: string;
+  entity_id?: string;
+  details: Record<string, unknown>;
+};
+
+/** Filters accepted by `GET /api/audit`. */
+export type AuditQuery = {
+  limit?: number;
+  action?: string;
+  user?: string;
+};
+
+// ---------------------------------------------------------------------------
+// v2 — Team / operator users (`/api/users`, admin only)
+// ---------------------------------------------------------------------------
+
+export type OperatorUser = {
+  id: string;
+  email: string;
+  full_name?: string;
+  role: OperatorRole;
+  created_at: string;
+};
+
+/** `POST /api/users` */
+export type UserDraft = {
+  email: string;
+  full_name?: string;
+  role: OperatorRole;
+  password: string;
+};
+
+/** `PATCH /api/users/{id}` */
+export type UserPatch = {
+  full_name?: string;
+  role?: OperatorRole;
+  password?: string;
+};
+
+// ---------------------------------------------------------------------------
+// v2 — Bulk import (`POST /api/members/import`)
+// ---------------------------------------------------------------------------
+
+export type ImportError = { line: number; message: string };
+
+export type ImportResult = {
+  created: number;
+  skipped: number;
+  errors: ImportError[];
 };

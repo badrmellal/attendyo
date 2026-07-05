@@ -1,17 +1,17 @@
-"""CompreFace recognition-engine client.
+"""Liwan Vision Engine client.
 
-Thin, defensive ``httpx`` wrapper over the CompreFace REST API. CompreFace is the
-Apache-2.0 recognition core bundled in the same compose stack. We talk to its
-**Recognition** service:
+Thin, defensive ``httpx`` wrapper over the vision engine's REST API. The engine
+is the recognition core bundled in the same compose stack (see NOTICE for
+third-party attribution). We talk to its **Recognition** service:
 
-* ``POST /api/v1/recognition/recognize``           — match a face image to subjects
+* ``POST /api/v1/recognition/recognize``            — match a face image to subjects
 * ``POST /api/v1/recognition/faces?subject=<name>`` — add a face to a subject
-* ``GET  /api/v1/recognition/subjects``            — list subjects
+* ``GET  /api/v1/recognition/subjects``             — list subjects
 * ``DELETE /api/v1/recognition/subjects/<name>``    — delete a subject + its faces
 
 Design goals:
 * **Tolerant when the engine is down.** Every method either returns a typed,
-  empty-ish result or raises ``ComprefaceUnavailable`` — it never leaks a raw
+  empty-ish result or raises ``EngineUnavailable`` — it never leaks a raw
   httpx error into a request handler. Callers decide how to degrade.
 * **Sync.** httpx is used synchronously; routers off-load via threadpool.
 """
@@ -26,19 +26,19 @@ import httpx
 
 from .config import get_settings
 
-logger = logging.getLogger("liwan.compreface")
+logger = logging.getLogger("liwan.engine")
 
 
-class ComprefaceError(Exception):
-    """Base class for CompreFace client errors."""
+class EngineError(Exception):
+    """Base class for vision-engine client errors."""
 
 
-class ComprefaceUnavailable(ComprefaceError):
+class EngineUnavailable(EngineError):
     """The engine could not be reached or timed out."""
 
 
-class ComprefaceRejected(ComprefaceError):
-    """The engine reached but rejected the request (e.g. no face detected)."""
+class EngineRejected(EngineError):
+    """The engine was reached but rejected the request (e.g. no face detected)."""
 
     def __init__(self, message: str, status_code: int | None = None) -> None:
         super().__init__(message)
@@ -66,15 +66,15 @@ class RecognitionResult:
 
 
 def _base_url() -> str:
-    return get_settings().compreface_api_url.rstrip("/")
+    return get_settings().engine_url.rstrip("/")
 
 
 def _headers() -> dict[str, str]:
-    return {"x-api-key": get_settings().compreface_api_key}
+    return {"x-api-key": get_settings().engine_api_key}
 
 
 def _client() -> httpx.Client:
-    return httpx.Client(timeout=get_settings().compreface_timeout_seconds)
+    return httpx.Client(timeout=get_settings().engine_timeout_seconds)
 
 
 # --------------------------------------------------------------------------- #
@@ -91,7 +91,7 @@ def recognize(
     """Recognize the most prominent face in ``image_bytes``.
 
     Returns a :class:`RecognitionResult`. When no face is detected the result has
-    ``face_detected=False`` and no subject. Raises :class:`ComprefaceUnavailable`
+    ``face_detected=False`` and no subject. Raises :class:`EngineUnavailable`
     only when the engine is unreachable.
     """
     url = f"{_base_url()}/api/v1/recognition/recognize"
@@ -104,17 +104,17 @@ def recognize(
         with _client() as client:
             resp = client.post(url, params=params, headers=_headers(), files=files)
     except httpx.HTTPError as exc:
-        logger.warning("CompreFace recognize unreachable: %s", exc)
-        raise ComprefaceUnavailable(str(exc)) from exc
+        logger.warning("Engine recognize unreachable: %s", exc)
+        raise EngineUnavailable(str(exc)) from exc
 
     # 400 typically means "No face found" — a normal outcome, not an error.
     if resp.status_code == 400:
-        logger.debug("CompreFace: no face detected (400)")
+        logger.debug("Engine: no face detected (400)")
         return RecognitionResult(face_detected=False)
     if resp.status_code >= 500:
-        raise ComprefaceUnavailable(f"engine {resp.status_code}")
+        raise EngineUnavailable(f"engine {resp.status_code}")
     if resp.status_code != 200:
-        raise ComprefaceRejected(
+        raise EngineRejected(
             f"recognize failed: {resp.text[:200]}", status_code=resp.status_code
         )
 
@@ -164,7 +164,7 @@ def add_subject_with_face(
 ) -> dict[str, Any]:
     """Add one face to ``subject_name`` (creating the subject implicitly).
 
-    CompreFace creates the subject on first face add, so a single call both
+    The engine creates the subject on first face add, so a single call both
     creates the subject and enrolls the face — "one photo is enough".
     """
     url = f"{_base_url()}/api/v1/recognition/faces"
@@ -177,20 +177,20 @@ def add_subject_with_face(
         with _client() as client:
             resp = client.post(url, params=params, headers=_headers(), files=files)
     except httpx.HTTPError as exc:
-        logger.warning("CompreFace add face unreachable: %s", exc)
-        raise ComprefaceUnavailable(str(exc)) from exc
+        logger.warning("Engine add face unreachable: %s", exc)
+        raise EngineUnavailable(str(exc)) from exc
 
     if resp.status_code in (200, 201):
         return resp.json()
     if resp.status_code == 400:
         # No face / multiple faces / bad image — actionable client error.
-        raise ComprefaceRejected(
+        raise EngineRejected(
             _extract_message(resp) or "No face detected in the supplied image",
             status_code=400,
         )
     if resp.status_code >= 500:
-        raise ComprefaceUnavailable(f"engine {resp.status_code}")
-    raise ComprefaceRejected(
+        raise EngineUnavailable(f"engine {resp.status_code}")
+    raise EngineRejected(
         _extract_message(resp) or f"add face failed ({resp.status_code})",
         status_code=resp.status_code,
     )
@@ -206,11 +206,11 @@ def delete_subject(subject_name: str) -> bool:
         with _client() as client:
             resp = client.delete(url, headers=_headers())
     except httpx.HTTPError as exc:
-        logger.warning("CompreFace delete subject unreachable: %s", exc)
+        logger.warning("Engine delete subject unreachable: %s", exc)
         return False
     if resp.status_code in (200, 201, 204, 404):
         return True
-    logger.warning("CompreFace delete subject %s -> %s", subject_name, resp.status_code)
+    logger.warning("Engine delete subject %s -> %s", subject_name, resp.status_code)
     return False
 
 
@@ -221,7 +221,7 @@ def list_subjects() -> list[str]:
         with _client() as client:
             resp = client.get(url, headers=_headers())
     except httpx.HTTPError as exc:
-        logger.warning("CompreFace list subjects unreachable: %s", exc)
+        logger.warning("Engine list subjects unreachable: %s", exc)
         return []
     if resp.status_code != 200:
         return []
@@ -229,7 +229,7 @@ def list_subjects() -> list[str]:
 
 
 def health() -> bool:
-    """Report whether the recognition engine answers. Never raises."""
+    """Report whether the vision engine answers. Never raises."""
     url = f"{_base_url()}/api/v1/recognition/subjects"
     try:
         with httpx.Client(timeout=5.0) as client:
@@ -241,7 +241,7 @@ def health() -> bool:
 
 
 def _extract_message(resp: httpx.Response) -> str | None:
-    """Pull a human message out of a CompreFace error body, if present."""
+    """Pull a human message out of an engine error body, if present."""
     try:
         body = resp.json()
     except ValueError:

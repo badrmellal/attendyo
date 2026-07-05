@@ -25,11 +25,11 @@
 | **Comment ça marche** | **How it works** |
 | 1. Inscrivez une personne avec **une photo**. 2. Une caméra ou une tablette à la porte reconnaît le visage. 3. La porte s'ouvre et la présence du jour est enregistrée (1ère entrée / dernière sortie, heures, retard). | 1. Enroll a person with **one photo**. 2. A camera or door tablet recognises the face. 3. The door opens and the day's attendance is logged (first-in / last-out, hours, lateness). |
 | **Pour qui** | **For whom** |
-| Entreprises, résidences haut de gamme, administrations & communes, banques, zones industrielles — tous sur réseau local, recherchant un **achat unique** sans abonnement. | Enterprises, high-end residences, government & municipalities, banks, industrial zones — all on the LAN, wanting a **one-time purchase** with no subscription. |
+| Entreprises, résidences haut de gamme, administrations & communes, banques, zones industrielles, **universités & campus** (mode campus : étudiants / enseignants / personnel, accès temporaires, rapports par faculté) — tous sur réseau local, recherchant un **achat unique** sans abonnement. | Enterprises, high-end residences, government & municipalities, banks, industrial zones, **universities & campuses** (campus mode: student / faculty / staff types, temporary access, per-faculty reports) — all on the LAN, wanting a **one-time purchase** with no subscription. |
 | **Conformité** | **Compliance** |
 | Architecture sur site, **les données ne quittent jamais le bâtiment**. L'autorisation **CNDP** et la base légale restent à la charge du client (voir doc sécurité). *Aucune certification revendiquée.* | On-prem by design, **data never leaves the building**. **CNDP** authorisation and lawful basis remain the buyer's responsibility (see security doc). *No certifications claimed.* |
 | **Moteur** | **Engine** |
-| Propulsé par le moteur **CompreFace** (Apache-2.0, © Exadel), exécuté localement. | Powered by the **CompreFace** engine (Apache-2.0, © Exadel), run locally. |
+| Propulsé par le **Liwan Vision Engine**, exécuté 100 % localement (composants open-source ; attribution complète dans le fichier NOTICE). | Powered by the **Liwan Vision Engine**, run fully on-site (open-source components; full attribution in the NOTICE file). |
 
 ---
 

@@ -4,12 +4,13 @@ Device/kiosk endpoint, authenticated by ``X-Device-Key`` (not a JWT). For each
 frame it:
 
 1. (Demo mode) returns a random active member without touching the engine, or
-2. Calls CompreFace ``recognize`` on the uploaded image.
+2. Calls the vision engine's ``recognize`` on the uploaded image.
 3. Runs the contract decision rules (``services.decision``).
 4. Writes an ``access_event`` (with optional snapshot).
 5. On ``granted`` (non-debounced) updates ``attendance_days`` and fires the
-   door driver.
-6. Publishes the event onto the SSE bus.
+   door driver. On any non-granted decision, records an ``alerts`` row.
+6. Publishes the event (and any alert) onto the SSE bus (``event: access`` /
+   ``event: alert``).
 7. Returns a ``RecognizeResult`` with a localized greeting.
 
 Returns 200 for every recognised/declined frame (the decision lives in the body);
@@ -26,13 +27,14 @@ from typing import Any, Optional
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from starlette.concurrency import run_in_threadpool
 
-from ..core import compreface, db, media, security
+from ..core import db, engine, media, security
 from ..events_bus import bus
 from ..doors import factory as door_factory
 from ..doors.base import DoorContext
 from ..models.schemas import RecognizeMember, RecognizeResult
 from ..services import attendance as attendance_service
 from ..services import decision as decision_service
+from . import alerts as alerts_router
 from . import settings as settings_router
 
 logger = logging.getLogger("liwan.recognize")
@@ -117,10 +119,16 @@ def _resolve_threshold(camera: Optional[dict[str, Any]]) -> float:
 
 
 def _pick_demo_member() -> Optional[dict[str, Any]]:
-    """Return a random active member for demo mode."""
+    """Return a random active, currently-valid member for demo mode."""
     rows = db.query_all(
-        "SELECT id, full_name, department, title, subject_name "
-        "FROM members WHERE status = 'active' ORDER BY random() LIMIT 1"
+        """
+        SELECT id, full_name, department, title, subject_name
+        FROM members
+        WHERE status = 'active'
+          AND (valid_from  IS NULL OR valid_from  <= current_date)
+          AND (valid_until IS NULL OR valid_until >= current_date)
+        ORDER BY random() LIMIT 1
+        """
     )
     return rows[0] if rows else None
 
@@ -194,7 +202,7 @@ async def recognize(
     else:
         try:
             recognition = await run_in_threadpool(
-                compreface.recognize,
+                engine.recognize,
                 data,
                 filename=image.filename or "frame.jpg",
                 det_prob_threshold=(
@@ -203,7 +211,7 @@ async def recognize(
                     else None
                 ),
             )
-        except compreface.ComprefaceUnavailable as exc:
+        except engine.EngineUnavailable as exc:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="Recognition engine unavailable",
@@ -270,10 +278,26 @@ async def recognize(
             except Exception as exc:  # pragma: no cover - driver-specific
                 logger.warning("Door driver failed on grant: %s", exc)
 
-    # ---- Publish SSE event ------------------------------------------------- #
+    # ---- Alert for every non-granted decision (v2) -------------------------- #
+    alert_payload: Optional[dict[str, Any]] = None
+    if decision.decision != "granted":
+        alert_payload = await run_in_threadpool(
+            alerts_router.record_decision_alert,
+            decision=decision.decision,
+            reason=decision.reason,
+            event_id=event_row["id"],
+            door_id=door_id_eff,
+            door_name=door.get("name") if door else None,
+            member_id=str(decision.member["id"]) if decision.member else None,
+            member_name=decision.member.get("full_name") if decision.member else None,
+        )
+
+    # ---- Publish SSE events -------------------------------------------------- #
     payload = _build_event_payload(event_row, decision, door, snapshot_path)
     payload["door_opened"] = door_opened
-    await bus.publish(payload)
+    await bus.publish(payload, event_type="access")
+    if alert_payload is not None:
+        await bus.publish(alert_payload, event_type="alert")
 
     # ---- Build response ---------------------------------------------------- #
     member_out: Optional[RecognizeMember] = None

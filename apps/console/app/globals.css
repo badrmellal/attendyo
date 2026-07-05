@@ -205,6 +205,63 @@ body {
   }
 }
 
+/* ===========================================================================
+   Print — the weekly report a director prints, and the evacuation (muster)
+   list. Force light ink-friendly tokens whatever the on-screen theme, strip
+   ambient art/shadows, and let tables break cleanly across pages.
+   =========================================================================== */
+@media print {
+  :root,
+  [data-theme="dark"],
+  [data-theme="light"] {
+    --bg: 255 255 255;
+    --surface: 255 255 255;
+    --surface-2: 244 244 246;
+    --border: 210 210 216;
+    --text: 17 17 22;
+    --text-muted: 90 90 100;
+    --shadow-strength: 0;
+    color-scheme: light;
+  }
+
+  body {
+    background: #fff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .app-aura {
+    background: none !important;
+  }
+
+  .card,
+  .card-quiet {
+    box-shadow: none !important;
+    border-color: rgb(var(--border)) !important;
+    break-inside: avoid;
+  }
+
+  table {
+    break-inside: auto;
+  }
+  tr {
+    break-inside: avoid;
+  }
+
+  /* An empty square the guard ticks with a pen (muster list). */
+  .print-checkbox {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 1.5px solid rgb(var(--text));
+    border-radius: 3px;
+  }
+
+  @page {
+    margin: 14mm 12mm;
+  }
+}
+
 /* Reduced motion: respect the user. */
 @media (prefers-reduced-motion: reduce) {
   *,

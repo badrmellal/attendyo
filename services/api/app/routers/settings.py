@@ -17,7 +17,7 @@ from typing import Any
 from fastapi import APIRouter, Depends
 from starlette.concurrency import run_in_threadpool
 
-from ..core import db, security
+from ..core import audit, db, security
 from ..models.schemas import (
     AttendanceSettings,
     Branding,
@@ -96,7 +96,16 @@ async def get_settings_endpoint(
 @router.put("", response_model=SettingsOut)
 async def put_settings_endpoint(
     payload: SettingsUpdate,
-    _admin: dict = Depends(security.require_admin),
+    admin: dict = Depends(security.require_admin),
 ) -> SettingsOut:
     """Update settings. Admin-only. Omitted sections are left unchanged."""
-    return await run_in_threadpool(_write_settings, payload)
+    result = await run_in_threadpool(_write_settings, payload)
+    sections = [
+        s for s, v in (("branding", payload.branding), ("attendance", payload.attendance))
+        if v is not None
+    ]
+    await run_in_threadpool(
+        audit.record, admin, "settings.update", entity="settings",
+        details={"sections": sections},
+    )
+    return result

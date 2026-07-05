@@ -15,8 +15,21 @@ interface RecognitionOverlayProps {
   locale: Locale;
 }
 
+/**
+ * Machine reason codes the kiosk localizes itself (CONTRACT.md → Decision
+ * rules v2). When one of these arrives it becomes the headline, and the raw
+ * code is suppressed — a visitor never sees "expired" verbatim.
+ */
+const LOCALIZED_REASONS: ReadonlySet<string> = new Set([
+  "expired",
+  "not_yet_valid",
+]);
+
 /** Pick the right localized reason line for a non-granted decision. */
 function denialMessage(result: KioskResult, s: Strings): string {
+  // Validity-window denials carry a specific reason code — most actionable line.
+  if (result.reason === "expired") return s.expired;
+  if (result.reason === "not_yet_valid") return s.notYetValid;
   switch (result.decision) {
     case "unknown_face":
       return s.unknownFace;
@@ -145,7 +158,7 @@ export function RecognitionOverlay({
         {denialMessage(result, s)}
       </h1>
 
-      {result.reason && (
+      {result.reason && !LOCALIZED_REASONS.has(result.reason) && (
         <p className="mt-3 text-[clamp(0.95rem,2.4vw,1.3rem)] font-medium text-text-muted">
           {result.reason}
         </p>

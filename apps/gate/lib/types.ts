@@ -37,6 +37,12 @@ export interface RecognizeResult {
   /** Localized welcome line, computed server-side; the UI may also localize. */
   greeting?: string;
   direction: Direction;
+  /**
+   * Machine reason code for non-granted decisions (e.g. "expired",
+   * "not_yet_valid" when the member's validity window does not cover today —
+   * CONTRACT.md → Decision rules v2). Optional superset of the base contract.
+   */
+  reason?: string;
 }
 
 /**

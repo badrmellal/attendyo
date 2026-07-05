@@ -17,6 +17,7 @@ export const DEFAULT_BRANDING: Branding = {
   accent_color: "#E0A340",
   logo_url: null,
   locale: "fr",
+  terminology: "workforce",
 };
 
 /** Apply primary/accent colors to the root as RGB triplets (alpha-friendly). */

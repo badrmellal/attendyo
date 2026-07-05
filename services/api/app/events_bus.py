@@ -1,7 +1,9 @@
 """In-process pub/sub broadcaster for Server-Sent Events.
 
-Every recognition decision is published here; the Console live monitor and the
-Gate kiosk subscribe over ``GET /api/events/stream`` (SSE, ``event: access``).
+Every recognition decision (``event: access``) and every security alert
+(``event: alert``) is published here; the Console live monitor and the Gate
+kiosk subscribe over ``GET /api/events/stream``. Each queue item is an
+envelope ``{"event": <sse event type>, "data": <payload dict>}``.
 
 This is intentionally a single-process, in-memory fan-out — appropriate for an
 on-prem single-box deployment. Each subscriber gets its own bounded
@@ -43,21 +45,24 @@ class EventBus:
             self._subscribers.discard(queue)
         logger.debug("SSE subscriber removed (now %d)", len(self._subscribers))
 
-    async def publish(self, event: dict[str, Any]) -> None:
-        """Broadcast ``event`` to all current subscribers without blocking.
+    async def publish(self, data: dict[str, Any], event_type: str = "access") -> None:
+        """Broadcast ``data`` as an SSE event of ``event_type`` to all subscribers.
 
-        If a subscriber's buffer is full, its oldest event is dropped to make
-        room — the live feed favours freshness over completeness.
+        ``event_type`` becomes the SSE ``event:`` field (``access`` for
+        recognition decisions, ``alert`` for security alerts). Non-blocking: if
+        a subscriber's buffer is full, its oldest event is dropped to make room
+        — the live feed favours freshness over completeness.
         """
+        envelope = {"event": event_type, "data": data}
         async with self._lock:
             targets = list(self._subscribers)
         for queue in targets:
             try:
-                queue.put_nowait(event)
+                queue.put_nowait(envelope)
             except asyncio.QueueFull:
                 try:
                     _ = queue.get_nowait()  # drop oldest
-                    queue.put_nowait(event)
+                    queue.put_nowait(envelope)
                 except (asyncio.QueueEmpty, asyncio.QueueFull):  # pragma: no cover
                     pass
 

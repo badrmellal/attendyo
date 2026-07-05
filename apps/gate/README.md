@@ -26,9 +26,12 @@ One of two front-ends over the Liwan API (see `CONTRACT.md`):
    a large localized welcome (`Bienvenue {name}`), the title/department, the
    check-in vs check-out direction and time, then returns to idle after ~3.5s.
 5. On **`unknown_face` / `not_authorized` / `off_schedule` / `denied`** it does
-   a single calm red shake with a short reason — no alarm theatrics.
-6. While idle it shows a live clock, date, the brand wordmark, and a soft
-   "Regardez la caméra" hint.
+   a single calm red shake with a short reason — no alarm theatrics. Validity-window
+   denials (reason `expired` / `not_yet_valid`) get their own localized line
+   ("Accès expiré — contactez l'accueil"), never the raw machine code.
+6. While idle it shows a live clock, date, the brand wordmark, a soft
+   "Regardez la caméra" hint, and a quiet privacy footer ("Traitement 100 %
+   local — vos données ne quittent pas le site.").
 
 It also subscribes (best-effort) to the `GET /api/events/stream` SSE feed so a
 person recognized by a fixed RTSP camera on the same door (via the Bridge) can

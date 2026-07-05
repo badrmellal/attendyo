@@ -15,8 +15,9 @@ alter it (see EULA §4(b)).
 1. CompreFace — face recognition engine
 ------------------------------------------------------------------------------
 LIWAN bundles and runs the CompreFace recognition engine as its recognition core
-(the engine images referenced in docker-compose.yml: compreface-postgres-db,
-compreface-admin, compreface-api, compreface-core, compreface-fe). LIWAN calls
+("Liwan Vision Engine" in product materials). The compose services
+liwan-engine-api, liwan-engine-admin, liwan-engine-core, and liwan-engine-ui in
+docker-compose.yml run the official, unmodified CompreFace images. LIWAN calls
 CompreFace over its HTTP API and does not modify the CompreFace source.
 
     Component:  CompreFace

@@ -22,6 +22,7 @@ import { Pill } from "@/components/StatusPill";
 import { useBranding } from "@/components/BrandingProvider";
 import { getSettings, putSettings } from "@/lib/api";
 import { applyBrandingColors } from "@/lib/branding";
+import { TERMINOLOGY_PRESETS, memberTypeOptions, terminologyLabels } from "@/lib/terminology";
 import type { Branding, Locale, Settings } from "@/lib/types";
 import { cn, hexToRgbTriplet } from "@/lib/utils";
 
@@ -42,8 +43,13 @@ export default function SettingsPage() {
   useEffect(() => {
     getSettings()
       .then((s) => {
-        setSettings(s);
-        setDraft(s);
+        // Older backends may not send the v2 terminology preset yet.
+        const normalized: Settings = {
+          ...s,
+          branding: { ...s.branding, terminology: s.branding.terminology ?? "workforce" },
+        };
+        setSettings(normalized);
+        setDraft(normalized);
       })
       .finally(() => setLoading(false));
   }, []);
@@ -110,6 +116,8 @@ export default function SettingsPage() {
   const b = draft.branding;
   const primaryValid = !!hexToRgbTriplet(b.primary_color);
   const accentValid = !!hexToRgbTriplet(b.accent_color);
+  // Live terminology preview — recomputed as the draft preset changes.
+  const termPreview = terminologyLabels(b.terminology);
 
   return (
     <div className="space-y-5">
@@ -223,6 +231,38 @@ export default function SettingsPage() {
                 ))}
               </div>
             </Field>
+
+            <Field label="Terminologie" className="mt-4">
+              <div className="grid gap-2 sm:grid-cols-3">
+                {TERMINOLOGY_PRESETS.map((p) => (
+                  <button
+                    key={p.value}
+                    type="button"
+                    onClick={() => patchBranding({ terminology: p.value })}
+                    aria-pressed={b.terminology === p.value}
+                    className={cn(
+                      "rounded-xl border px-3.5 py-3 text-left transition-colors",
+                      b.terminology === p.value
+                        ? "border-primary/40 bg-primary/[0.06]"
+                        : "border-border hover:bg-surface-2/40",
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "block text-sm font-medium",
+                        b.terminology === p.value ? "text-primary" : "text-text",
+                      )}
+                    >
+                      {p.label}
+                    </span>
+                    <span className="mt-0.5 block text-xs text-text-muted">{p.hint}</span>
+                  </button>
+                ))}
+              </div>
+              <p className="mt-1.5 text-xs text-text-muted/80">
+                Relabellise toute la Console — menu, filtres, rapports — sans redéploiement.
+              </p>
+            </Field>
           </section>
 
           {/* Attendance config */}
@@ -321,6 +361,33 @@ export default function SettingsPage() {
                   <p className="text-xs text-text-muted">Entrée Principale</p>
                 </div>
                 <span className="text-xs font-medium text-primary">Autorisé</span>
+              </div>
+
+              {/* Terminology preview */}
+              <div className="rounded-lg bg-surface-2/40 px-3 py-2.5">
+                <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">
+                  Terminologie —{" "}
+                  {TERMINOLOGY_PRESETS.find((p) => p.value === b.terminology)?.label}
+                </p>
+                <p className="mt-1.5 text-xs text-text-muted">
+                  Menu : <span className="font-medium text-text">{termPreview.peopleNav}</span>
+                </p>
+                <p className="text-xs text-text-muted">
+                  Champ :{" "}
+                  <span className="font-medium text-text">{termPreview.departmentLabel}</span>
+                </p>
+                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                  {memberTypeOptions(termPreview)
+                    .slice(0, 3)
+                    .map((o) => (
+                      <span
+                        key={o.value}
+                        className="rounded-md border border-border bg-surface px-1.5 py-0.5 text-[11px] text-text-muted"
+                      >
+                        {o.label}
+                      </span>
+                    ))}
+                </div>
               </div>
 
               {/* Locale note */}

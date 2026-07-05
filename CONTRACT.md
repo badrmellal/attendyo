@@ -10,7 +10,7 @@ a module needs a change, update this file first.
  Camera (RTSP/USB) ─► Bridge (Python) ─┐
                                        ├─► POST /api/recognize ─► Liwan API (FastAPI)
  Gate kiosk (browser webcam) ──────────┘                              │
-                                                                      ├─► CompreFace engine  (recognize / enroll)
+                                                                      ├─► Vision engine  (recognize / enroll)
                                                                       ├─► Postgres (schema `liwan`)
                                                                       └─► Door driver (webhook | pi_gpio | simulation)
 
@@ -69,18 +69,18 @@ type RecognizeResult = {
 
 ### Recognition (device / kiosk — the hot path)
 - `POST /api/recognize` (multipart: `image`, `camera_id?`, `door_id?`) → `RecognizeResult`
-  - Calls CompreFace `recognize`, picks best subject, checks threshold + access group +
+  - Calls the engine's `recognize`, picks best subject, checks threshold + access group +
     schedule, writes an `access_event`, updates `attendance_days`, fires the door driver
     when granted. **One enrolled image is enough** to be recognised here.
 
 ### Enrollment (one photo is enough)
 - `POST /api/members` (multipart: member fields + single `image`) → `Member`
-  - Creates the CompreFace subject and adds the one face in a single call.
+  - Creates the engine subject and adds the one face in a single call.
 - `POST /api/members/{id}/photo` (multipart `image`) → add/replace face (optional, improves robustness)
 - `GET  /api/members` `?q=&status=&department=&type=` → `Member[]`
 - `GET  /api/members/{id}` → `Member`
 - `PATCH /api/members/{id}` → `Member`
-- `DELETE /api/members/{id}` → removes member + CompreFace subject
+- `DELETE /api/members/{id}` → removes member + engine subject
 
 ### Attendance (the morning-in / evening-out record, per day)
 - `GET /api/attendance?date=YYYY-MM-DD` → `AttendanceDay[]` (all members; absent included)
@@ -180,15 +180,15 @@ type Alert = { id:number; ts:string; kind:"unknown_face"|"not_authorized"|"off_s
 The recognition core is referred to as the **Liwan Vision Engine** in every
 customer-facing surface (docs, sales, UI, compose service names, env vars).
 Env vars: `ENGINE_URL` / `ENGINE_API_KEY` (the API also accepts the legacy
-`COMPREFACE_API_URL` / `COMPREFACE_API_KEY` as fallbacks). Third-party attribution
+legacy engine variable names as fallbacks). Third-party attribution
 lives ONLY in `NOTICE` / the licence section, as Apache-2.0 requires.
 
 ### Health
-- `GET /health` → `{ status:"ok", compreface:"ok"|"down", db:"ok"|"down" }`
+- `GET /health` → `{ status:"ok"|"degraded", engine:"ok"|"down", db:"ok"|"down" }`
 
 ## Recognition → decision rules (implemented by the API)
 
-1. CompreFace returns subjects with similarity. Take the top match.
+1. The engine returns subjects with similarity. Take the top match.
 2. `similarity < camera.recognition_threshold` → `unknown_face`, door stays shut.
 3. Match found but member `status != active` → `not_authorized`.
 4. Member's access group does not include this door → `not_authorized`.

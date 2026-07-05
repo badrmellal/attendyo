@@ -1,11 +1,12 @@
 """Events router — historical list + live SSE stream.
 
 * ``GET /api/events?date=&decision=&door_id=&limit=`` → ``AccessEvent[]``.
-* ``GET /api/events/stream``                          → SSE, ``event: access``.
+* ``GET /api/events/stream``                          → SSE (``access`` + ``alert``).
 
-The stream emits one ``event: access`` SSE message per new decision. Both the
-Console live monitor and the Gate kiosk subscribe. Heartbeat comments keep
-proxies from idling the connection.
+The stream emits one ``event: access`` SSE message per new decision and one
+``event: alert`` per security alert (non-granted decisions). Both the Console
+live monitor and the Gate kiosk subscribe. Heartbeat comments keep proxies
+from idling the connection.
 """
 
 from __future__ import annotations
@@ -114,7 +115,14 @@ async def stream(
             headers={"WWW-Authenticate": "Bearer"},
         )
     payload = security.decode_token(bearer)
-    user = await run_in_threadpool(security._load_user, payload.get("sub", ""))
+    sub = payload.get("sub")
+    if not sub:
+        raise HTTPException(
+            status_code=401,
+            detail="Malformed token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    user = await run_in_threadpool(security._load_user, sub)
     if user is None:
         raise HTTPException(status_code=401, detail="User no longer exists")
 
@@ -127,13 +135,14 @@ async def stream(
                 if await request.is_disconnected():
                     break
                 try:
-                    event = await asyncio.wait_for(queue.get(), timeout=20.0)
+                    envelope = await asyncio.wait_for(queue.get(), timeout=20.0)
                 except asyncio.TimeoutError:
                     # Heartbeat comment; keeps intermediaries from dropping us.
                     yield b": keep-alive\n\n"
                     continue
-                data = json.dumps(event, default=str)
-                yield f"event: access\ndata: {data}\n\n".encode("utf-8")
+                event_type = envelope.get("event", "access")
+                data = json.dumps(envelope.get("data", {}), default=str)
+                yield f"event: {event_type}\ndata: {data}\n\n".encode("utf-8")
         finally:
             await bus.unsubscribe(queue)
 

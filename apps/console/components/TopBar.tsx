@@ -7,12 +7,21 @@
  */
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Menu, LogOut, ChevronDown, Wifi, WifiOff, FlaskConical } from "lucide-react";
+import { Menu, LogOut, ChevronDown, Wifi, WifiOff, FlaskConical, Bell } from "lucide-react";
 import { useBranding } from "./BrandingProvider";
 import { ThemeToggle } from "./ThemeToggle";
 import { Avatar } from "./Avatar";
-import { getHealth, isMockForced, me, setToken } from "@/lib/api";
+import {
+  ALERTS_CHANGED_EVENT,
+  getAlertCount,
+  getHealth,
+  isMockForced,
+  me,
+  setToken,
+  streamEvents,
+} from "@/lib/api";
 import type { AuthUser, HealthStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -21,6 +30,7 @@ export function TopBar({ title, onOpenSidebar }: { title: string; onOpenSidebar?
   const { t } = useBranding();
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [unackAlerts, setUnackAlerts] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -34,6 +44,25 @@ export function TopBar({ title, onOpenSidebar }: { title: string; onOpenSidebar?
       .catch(() => {});
     return () => {
       active = false;
+    };
+  }, []);
+
+  // Alert badge: initial count, refreshed on live `alert` SSE frames and on
+  // the app-wide "alerts changed" signal fired after any acknowledgement.
+  useEffect(() => {
+    let active = true;
+    const refresh = () => {
+      getAlertCount()
+        .then((c) => active && setUnackAlerts(c.unacknowledged))
+        .catch(() => {});
+    };
+    refresh();
+    const unsub = streamEvents(() => {}, { onAlert: refresh });
+    window.addEventListener(ALERTS_CHANGED_EVENT, refresh);
+    return () => {
+      active = false;
+      unsub();
+      window.removeEventListener(ALERTS_CHANGED_EVENT, refresh);
     };
   }, []);
 
@@ -53,10 +82,10 @@ export function TopBar({ title, onOpenSidebar }: { title: string; onOpenSidebar?
     router.push("/login");
   }
 
-  const healthy = health?.status === "ok" && health.compreface === "ok" && health.db === "ok";
+  const healthy = health?.status === "ok" && health.engine === "ok" && health.db === "ok";
 
   return (
-    <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-border bg-bg/80 px-4 backdrop-blur-md md:px-6">
+    <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-border bg-bg/80 px-4 backdrop-blur-md print:hidden md:px-6">
       <button
         type="button"
         onClick={onOpenSidebar}
@@ -86,13 +115,27 @@ export function TopBar({ title, onOpenSidebar }: { title: string; onOpenSidebar?
           )}
           title={
             health
-              ? `CompreFace: ${health.compreface} · DB: ${health.db}`
+              ? `Moteur de vision: ${health.engine} · Base de données: ${health.db}`
               : "Engine unreachable"
           }
         >
           {healthy ? <Wifi className="h-3.5 w-3.5" /> : <WifiOff className="h-3.5 w-3.5" />}
           {healthy ? "Engine online" : "Engine offline"}
         </span>
+
+        {/* Alerts bell — unacknowledged count, links to /alerts */}
+        <Link
+          href="/alerts"
+          aria-label={`Alertes${unackAlerts > 0 ? ` — ${unackAlerts} non acquittée(s)` : ""}`}
+          className="relative flex h-9 w-9 items-center justify-center rounded-lg border border-border text-text-muted transition-colors hover:border-text-muted/40 hover:text-text"
+        >
+          <Bell className="h-4.5 w-4.5" size={18} />
+          {unackAlerts > 0 && (
+            <span className="absolute -right-1.5 -top-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-danger px-1 text-[10px] font-bold leading-none text-[#FBFAFF]">
+              {unackAlerts > 99 ? "99+" : unackAlerts}
+            </span>
+          )}
+        </Link>
 
         <ThemeToggle />
 

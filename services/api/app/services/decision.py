@@ -2,9 +2,12 @@
 
 Implements section *"Recognition → decision rules"* of CONTRACT.md exactly:
 
-1. Take the top CompreFace match.
+1. Take the top engine match.
 2. ``similarity < camera.recognition_threshold`` → ``unknown_face`` (door shut).
 3. Member ``status != active`` → ``not_authorized``.
+3b. (v2) Member has a validity window and today is outside
+    ``[valid_from, valid_until]`` → ``not_authorized`` with reason
+    ``"expired"`` / ``"not_yet_valid"``.
 4. Member's access group does not include this door → ``not_authorized``.
 5. Outside the access-group schedule → ``off_schedule``.
 6. Otherwise → ``granted``.
@@ -162,7 +165,7 @@ def decide(
     member = db.query_one(
         """
         SELECT id, external_id, full_name, subject_name, member_type, department,
-               title, email, phone, access_group_id, status
+               title, email, phone, access_group_id, valid_from, valid_until, status
         FROM members
         WHERE subject_name = %s
         LIMIT 1
@@ -185,6 +188,28 @@ def decide(
             decision="not_authorized",
             direction=direction,
             reason=f"Member status is {member['status']}",
+            member=member,
+            similarity=similarity,
+            subject_name=subject_name,
+        )
+
+    # Rule 3b (v2): temporary-access validity window (visitors, contractors,
+    # exchange students). NULL on either side = unbounded on that side.
+    today = now.date()
+    if member.get("valid_from") and today < member["valid_from"]:
+        return Decision(
+            decision="not_authorized",
+            direction=direction,
+            reason="not_yet_valid",
+            member=member,
+            similarity=similarity,
+            subject_name=subject_name,
+        )
+    if member.get("valid_until") and today > member["valid_until"]:
+        return Decision(
+            decision="not_authorized",
+            direction=direction,
+            reason="expired",
             member=member,
             similarity=similarity,
             subject_name=subject_name,

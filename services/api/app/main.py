@@ -5,7 +5,8 @@ routers from the contract, a ``/media`` static mount, and startup work:
 
 1. Initialise the Postgres connection pool.
 2. Apply ``schema.sql`` if reachable on disk (self-healing when the DB init
-   script did not run).
+   script did not run), then every ``db/migrations/*.sql`` in filename order —
+   all migration files are idempotent, so this is safe on every boot.
 3. Ensure the seeded admin operator exists.
 4. Seed the demo dataset when ``LIWAN_DEMO_MODE`` is on and the DB is empty.
 
@@ -30,16 +31,21 @@ from .core import db, media
 from .core.config import get_settings
 from .routers import (
     access_groups,
+    alerts,
     attendance,
+    audit as audit_router,
     auth,
     cameras,
     doors,
     events,
     health,
     members,
+    presence,
     recognize,
+    reports,
     settings as settings_router,
     stats,
+    users,
 )
 from .seed import ensure_admin_user, seed_demo_if_enabled
 
@@ -50,33 +56,58 @@ logging.basicConfig(
 logger = logging.getLogger("liwan.main")
 
 
-def _apply_schema() -> None:
-    """Apply schema.sql if present on disk (idempotent CREATE IF NOT EXISTS)."""
-    settings = get_settings()
-    schema_path = Path(settings.schema_sql_path)
-    if not schema_path.exists():
-        logger.info(
-            "schema.sql not found at %s; assuming DB initialised externally",
-            schema_path,
-        )
+def _run_sql_file(path: Path, label: str) -> None:
+    """Execute one SQL file, logging success/failure (never raises)."""
+    try:
+        sql = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        logger.warning("Could not read %s %s (continuing): %s", label, path, exc)
         return
-    sql = schema_path.read_text(encoding="utf-8")
     try:
         with db.get_conn() as conn:
             with conn.cursor() as cur:
                 cur.execute(sql)
-        logger.info("Applied schema.sql from %s", schema_path)
+        logger.info("Applied %s %s", label, path.name)
     except Exception as exc:  # pragma: no cover - depends on live DB
-        # Schema is normally applied by the Postgres init script; a failure here
-        # is logged but not fatal so the API can still serve /health.
-        logger.warning("Could not apply schema.sql (continuing): %s", exc)
+        # Schema/migrations are normally applied by the Postgres init script; a
+        # failure here is logged but not fatal so the API can still serve /health.
+        logger.warning("Could not apply %s %s (continuing): %s", label, path.name, exc)
+
+
+def _apply_schema_and_migrations() -> None:
+    """Best-effort DB bootstrap: schema.sql, then db/migrations/*.sql in order.
+
+    Every file is idempotent (``IF NOT EXISTS`` / conditional DO-blocks), so the
+    whole sequence is safe to run on every startup — self-healing whether the
+    database is fresh, at v1, or already at the latest version.
+    """
+    settings = get_settings()
+    schema_path = Path(settings.schema_sql_path)
+    if schema_path.exists():
+        _run_sql_file(schema_path, "schema")
+    else:
+        logger.info(
+            "schema.sql not found at %s; assuming DB initialised externally",
+            schema_path,
+        )
+
+    migrations_dir = Path(settings.migrations_dir)
+    if not migrations_dir.is_dir():
+        logger.info("No migrations directory at %s; skipping", migrations_dir)
+        return
+    migration_files = sorted(migrations_dir.glob("*.sql"))
+    if not migration_files:
+        logger.info("Migrations directory %s is empty", migrations_dir)
+        return
+    for path in migration_files:
+        _run_sql_file(path, "migration")
 
 
 def _startup_sync() -> None:
     """Blocking startup steps, run once in a worker thread."""
     db.init_pool()
     media.ensure_dirs()
-    _apply_schema()
+    _apply_schema_and_migrations()
     try:
         ensure_admin_user()
         seed_demo_if_enabled()
@@ -130,6 +161,12 @@ def create_app() -> FastAPI:
     app.include_router(cameras.router)
     app.include_router(access_groups.router)
     app.include_router(settings_router.router)
+    # v2 routers.
+    app.include_router(reports.router)
+    app.include_router(presence.router)
+    app.include_router(alerts.router)
+    app.include_router(audit_router.router)
+    app.include_router(users.router)
 
     # Static media (snapshots). Created at startup; mounting a missing dir would
     # raise, so ensure it exists here too for safety.

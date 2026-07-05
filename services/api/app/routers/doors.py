@@ -17,7 +17,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from starlette.concurrency import run_in_threadpool
 
-from ..core import db, security
+from ..core import audit, db, security
 from ..doors import factory as door_factory
 from ..doors.base import DoorContext
 from ..models.schemas import Door, DoorCreate, DoorUpdate
@@ -64,7 +64,7 @@ async def list_doors(_user: dict = Depends(security.get_current_user)) -> list[D
 @router.post("", response_model=Door, status_code=status.HTTP_201_CREATED)
 async def create_door(
     payload: DoorCreate,
-    _user: dict = Depends(security.get_current_user),
+    user: dict = Depends(security.require_operator),
 ) -> Door:
     row = await run_in_threadpool(
         db.execute_returning,
@@ -82,6 +82,10 @@ async def create_door(
         ),
     )
     assert row is not None
+    await run_in_threadpool(
+        audit.record, user, "door.create", entity="door", entity_id=str(row["id"]),
+        details={"name": payload.name},
+    )
     return _to_door(row)
 
 
@@ -89,7 +93,7 @@ async def create_door(
 async def update_door(
     door_id: str,
     payload: DoorUpdate,
-    _user: dict = Depends(security.get_current_user),
+    user: dict = Depends(security.require_operator),
 ) -> Door:
     updates = payload.model_dump(exclude_unset=True)
     if not updates:
@@ -117,26 +121,33 @@ async def update_door(
     )
     if row is None:
         raise HTTPException(status_code=404, detail="Door not found")
+    await run_in_threadpool(
+        audit.record, user, "door.update", entity="door", entity_id=door_id,
+        details={"fields": sorted(updates.keys())},
+    )
     return _to_door(row)
 
 
 @router.delete("/{door_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_door(
     door_id: str,
-    _user: dict = Depends(security.get_current_user),
+    user: dict = Depends(security.require_operator),
 ) -> None:
     affected = await run_in_threadpool(
         db.execute, "DELETE FROM doors WHERE id = %s", (door_id,)
     )
     if affected == 0:
         raise HTTPException(status_code=404, detail="Door not found")
+    await run_in_threadpool(
+        audit.record, user, "door.delete", entity="door", entity_id=door_id,
+    )
     return None
 
 
 @router.post("/{door_id}/open")
 async def open_door(
     door_id: str,
-    current_user: dict = Depends(security.get_current_user),
+    current_user: dict = Depends(security.require_operator),
 ) -> dict[str, Any]:
     """Manually pulse the door (operator test). Actuates the configured driver."""
     door = await run_in_threadpool(
@@ -160,4 +171,8 @@ async def open_door(
         logger.warning("Manual door open failed: %s", exc)
         raise HTTPException(status_code=502, detail="Door driver failed") from exc
 
+    await run_in_threadpool(
+        audit.record, current_user, "door.open", entity="door", entity_id=door_id,
+        details={"opened": result.opened, "manual": True},
+    )
     return {"door_id": str(door["id"]), "opened": result.opened, "detail": result.detail}

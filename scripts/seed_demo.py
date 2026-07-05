@@ -6,15 +6,20 @@ Run this against a running Postgres (the one in docker-compose) to populate:
 * 1 site (Siège Casablanca, 09:00–18:00, 10-min grace).
 * 2 doors — a main entrance ("in") and a staff exit ("out").
 * 1 camera bound to the entrance.
-* ~18 members across departments (employees + a contractor + a visitor).
+* ~18 members across departments, including a visitor whose access **already
+  expired** and a contractor whose window **starts next week** (v2 validity).
 * A week of ``attendance_days`` with realistic morning-in / evening-out times,
   some late arrivals, and some absences.
 * ~60 ``access_events`` for *today* (granted in/out + a few unknown/off-schedule)
-  so the live monitor, stats and Gate have data.
+  so the live monitor, stats, reports, presence view and Gate have data.
+* Unacknowledged ``alerts`` linked to today's denied events (v2).
+* A few demo-tagged ``audit_log`` rows (v2).
+* Demo **operator** and **viewer** logins (operator@liwan.local / liwan-operator,
+  viewer@liwan.local / liwan-viewer) next to the admin.
 
 It is **safe to re-run**: the demo set is cleared and rebuilt each time, while
-operator users and settings are left untouched. The admin operator is ensured so
-you can log in immediately.
+real operator users and settings are left untouched. The admin operator is
+ensured so you can log in immediately.
 
 Usage::
 
@@ -66,12 +71,16 @@ def main() -> int:
         db.close_pool()
 
     logger.info(
-        "Done. site=%s doors=%d members=%d events_today=%d",
-        summary["site"], len(summary["doors"]), summary["members"], summary["events_today"],
+        "Done. site=%s doors=%d members=%d events_today=%d alerts_open=%d audit_rows=%d",
+        summary["site"], len(summary["doors"]), summary["members"],
+        summary["events_today"], summary.get("alerts_open", 0),
+        summary.get("audit_rows", 0),
     )
     print(
         "Demo data seeded. Log in with the configured LIWAN_ADMIN_EMAIL / "
-        "LIWAN_ADMIN_PASSWORD (default admin@liwan.local / liwan-admin)."
+        "LIWAN_ADMIN_PASSWORD (default admin@liwan.local / liwan-admin).\n"
+        "Extra demo logins: operator@liwan.local / liwan-operator, "
+        "viewer@liwan.local / liwan-viewer."
     )
     return 0
 

@@ -15,12 +15,17 @@ from pydantic import BaseModel, Field
 # --------------------------------------------------------------------------- #
 # Enumerations (kept as Literals to match the contract's string unions)
 # --------------------------------------------------------------------------- #
-MemberType = Literal["employee", "resident", "contractor", "visitor"]
+MemberType = Literal[
+    "employee", "resident", "contractor", "visitor", "student", "faculty", "staff"
+]
 MemberStatus = Literal["active", "suspended", "archived"]
 Direction = Literal["in", "out", "unknown"]
 Decision = Literal["granted", "denied", "unknown_face", "not_authorized", "off_schedule"]
 AttendanceStatus = Literal["present", "late", "absent", "incomplete"]
 UserRole = Literal["admin", "operator", "viewer"]
+AlertKind = Literal["unknown_face", "not_authorized", "off_schedule", "system"]
+AlertSeverity = Literal["info", "warning", "critical"]
+Terminology = Literal["workforce", "campus", "residence"]
 
 
 # --------------------------------------------------------------------------- #
@@ -39,11 +44,30 @@ class TokenResponse(BaseModel):
 
 
 class UserOut(BaseModel):
+    """Operator user, as returned by the API. Never carries the password hash."""
+
     id: str
     email: str
     full_name: Optional[str] = None
     role: UserRole
     created_at: datetime
+
+
+class UserCreate(BaseModel):
+    """``POST /api/users`` body (admin only)."""
+
+    email: str
+    full_name: Optional[str] = None
+    role: UserRole = "operator"
+    password: str = Field(min_length=8, description="Plaintext; stored bcrypt-hashed")
+
+
+class UserUpdate(BaseModel):
+    """``PATCH /api/users/{id}`` body (admin only). Only supplied keys change."""
+
+    full_name: Optional[str] = None
+    role: Optional[UserRole] = None
+    password: Optional[str] = Field(default=None, min_length=8)
 
 
 # --------------------------------------------------------------------------- #
@@ -63,6 +87,8 @@ class Member(BaseModel):
     phone: Optional[str] = None
     access_group_id: Optional[str] = None
     photo_url: Optional[str] = None
+    valid_from: Optional[date] = None
+    valid_until: Optional[date] = None
     status: MemberStatus
     created_at: datetime
 
@@ -78,7 +104,24 @@ class MemberUpdate(BaseModel):
     email: Optional[str] = None
     phone: Optional[str] = None
     access_group_id: Optional[str] = None
+    valid_from: Optional[date] = None
+    valid_until: Optional[date] = None
     status: Optional[MemberStatus] = None
+
+
+class ImportLineError(BaseModel):
+    """One rejected CSV line during bulk import."""
+
+    line: int
+    message: str
+
+
+class ImportResult(BaseModel):
+    """Response of ``POST /api/members/import``."""
+
+    created: int
+    skipped: int
+    errors: list[ImportLineError] = Field(default_factory=list)
 
 
 # --------------------------------------------------------------------------- #
@@ -259,6 +302,9 @@ class Branding(BaseModel):
     accent_color: str = "#E0A340"
     logo_url: Optional[str] = None
     locale: Literal["fr", "en", "ar"] = "fr"
+    # UI terminology preset (contract: workforce | campus | residence). The API
+    # only stores the preset; labels live in the Console/Gate i18n layer.
+    terminology: Terminology = "workforce"
 
 
 class AttendanceSettings(BaseModel):
@@ -284,5 +330,115 @@ class SettingsUpdate(BaseModel):
 # --------------------------------------------------------------------------- #
 class HealthOut(BaseModel):
     status: Literal["ok", "degraded"]
-    compreface: Literal["ok", "down"]
+    engine: Literal["ok", "down"]
     db: Literal["ok", "down"]
+
+
+# --------------------------------------------------------------------------- #
+# Alerts (v2)
+# --------------------------------------------------------------------------- #
+class Alert(BaseModel):
+    """Matches contract ``Alert``."""
+
+    id: int
+    ts: datetime
+    kind: AlertKind
+    severity: AlertSeverity
+    message: str
+    event_id: Optional[int] = None
+    door_id: Optional[str] = None
+    door_name: Optional[str] = None
+    member_id: Optional[str] = None
+    member_name: Optional[str] = None
+    acknowledged: bool = False
+    acknowledged_by_email: Optional[str] = None
+    acknowledged_at: Optional[datetime] = None
+
+
+class AlertCount(BaseModel):
+    unacknowledged: int
+
+
+class AckAllResult(BaseModel):
+    acknowledged: int
+
+
+# --------------------------------------------------------------------------- #
+# Audit log (v2)
+# --------------------------------------------------------------------------- #
+class AuditEntry(BaseModel):
+    """One append-only audit row (``GET /api/audit``)."""
+
+    id: int
+    ts: datetime
+    user_email: Optional[str] = None
+    action: str
+    entity: Optional[str] = None
+    entity_id: Optional[str] = None
+    details: dict = Field(default_factory=dict)
+
+
+# --------------------------------------------------------------------------- #
+# Reports & analytics (v2)
+# --------------------------------------------------------------------------- #
+class ReportDailyBucket(BaseModel):
+    date: date
+    present: int
+    late: int
+    absent: int
+
+
+class ReportSummary(BaseModel):
+    """``GET /api/reports/summary`` response."""
+
+    days: int
+    avg_present: float
+    avg_late: float
+    avg_absent: float
+    # Fraction 0..1 of arrivals that were on time over the range.
+    punctuality_rate: float
+    avg_worked_seconds: float
+    daily: list[ReportDailyBucket] = Field(default_factory=list)
+
+
+class DepartmentReport(BaseModel):
+    """One row of ``GET /api/reports/departments``."""
+
+    department: str
+    members: int
+    present_days: int
+    late_days: int
+    absent_days: int
+    avg_worked_seconds: float
+
+
+class MemberReport(BaseModel):
+    """One row of ``GET /api/reports/members``."""
+
+    member_id: str
+    member_name: str
+    department: Optional[str] = None
+    present_days: int
+    late_days: int
+    absent_days: int
+    avg_arrival: Optional[str] = None  # "HH:MM" local, or null if never arrived
+    total_worked_seconds: int
+
+
+# --------------------------------------------------------------------------- #
+# Presence / muster (v2)
+# --------------------------------------------------------------------------- #
+class PresencePerson(BaseModel):
+    member_id: str
+    member_name: str
+    department: Optional[str] = None
+    member_type: MemberType
+    first_in_ts: datetime
+    first_in_door_name: Optional[str] = None
+
+
+class PresenceNow(BaseModel):
+    """``GET /api/presence/now`` — everyone currently on site."""
+
+    count: int
+    people: list[PresencePerson] = Field(default_factory=list)

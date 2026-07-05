@@ -14,15 +14,30 @@ import type {
   AccessDecision,
   AccessEvent,
   AccessGroup,
+  AccessGroupDraft,
+  Alert,
+  AlertKind,
+  AlertQuery,
   AttendanceDay,
+  AuditEntry,
+  AuditQuery,
   Branding,
   Camera,
+  DepartmentReport,
   Door,
   Member,
+  MemberReport,
+  OperatorUser,
+  PresenceNow,
+  ReportSort,
+  ReportsDaily,
+  ReportsSummary,
   Settings,
   TodayStats,
+  UserDraft,
+  UserPatch,
 } from "./types";
-import { todayISO } from "./utils";
+import { shiftDate, todayISO } from "./utils";
 
 /**
  * Stable id generator for newly-created mock rows. Uses crypto.randomUUID when
@@ -48,6 +63,9 @@ type Seed = {
   title: string;
   type: Member["member_type"];
   status?: Member["status"];
+  /** Days relative to today for the temporary-access window (v2). */
+  validFromDays?: number;
+  validUntilDays?: number;
 };
 
 const SEED_PEOPLE: Seed[] = [
@@ -71,10 +89,10 @@ const SEED_PEOPLE: Seed[] = [
   { name: "Tariq Ghali", dept: "Sécurité", title: "Agent de Nuit", type: "employee", status: "suspended" },
   { name: "Meryem Daoudi", dept: "Ressources Humaines", title: "Gestionnaire Paie", type: "employee" },
   { name: "Zakaria Benslimane", dept: "Opérations", title: "Coordinateur", type: "employee" },
-  { name: "ATLAS Maintenance", dept: "Prestataires", title: "Maintenance HVAC", type: "contractor" },
+  { name: "ATLAS Maintenance", dept: "Prestataires", title: "Maintenance HVAC", type: "contractor", validFromDays: -30, validUntilDays: 60 },
   { name: "Said Ouatar", dept: "Prestataires", title: "Nettoyage", type: "contractor" },
-  { name: "Leila Hassani", dept: "Visiteurs", title: "Auditrice Externe", type: "visitor" },
-  { name: "Marc Dubois", dept: "Visiteurs", title: "Consultant", type: "visitor", status: "archived" },
+  { name: "Leila Hassani", dept: "Visiteurs", title: "Auditrice Externe", type: "visitor", validFromDays: -14, validUntilDays: -2 },
+  { name: "Marc Dubois", dept: "Visiteurs", title: "Consultant", type: "visitor", status: "archived", validFromDays: -90, validUntilDays: -60 },
 ];
 
 function uuid(seed: number): string {
@@ -105,6 +123,8 @@ export const MOCK_MEMBERS: Member[] = SEED_PEOPLE.map((p, i) => ({
       ? undefined
       : `${p.name.toLowerCase().replace(/[^a-z]+/g, ".")}@entreprise.ma`,
   phone: `+212 6${String(10000000 + i * 137).slice(0, 8)}`,
+  valid_from: p.validFromDays != null ? shiftDate(todayISO(), p.validFromDays) : undefined,
+  valid_until: p.validUntilDays != null ? shiftDate(todayISO(), p.validUntilDays) : undefined,
   status: p.status ?? "active",
   created_at: iso(-1000 * 60 * 60 * 24 * (30 + i)),
 }));
@@ -199,39 +219,56 @@ export const MOCK_CAMERAS: Camera[] = [
 ];
 
 // --------------------------------------------------------------------------
-// Attendance for "today" — deterministic but lively.
+// Attendance — deterministic but lively, for ANY work date. Each date gets its
+// own seed shift so navigating the date picker shows plausibly different days;
+// weekends are empty (everyone absent), past days are fully clocked out.
 // --------------------------------------------------------------------------
 const WORKDAY = todayISO();
 
-function makeAttendance(): AttendanceDay[] {
-  return MOCK_MEMBERS.map((m, i) => {
+/** Small deterministic per-date offset so each day looks different. */
+function dateSeed(dateISO: string): number {
+  let h = 0;
+  for (let i = 0; i < dateISO.length; i++) h = (h * 31 + dateISO.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
+
+function makeAttendance(dateISO: string = WORKDAY): AttendanceDay[] {
+  const seed = dateSeed(dateISO);
+  const isToday = dateISO === WORKDAY;
+  const dow = new Date(`${dateISO}T12:00:00`).getDay(); // 0=Sun … 6=Sat
+  // Historical weekends are empty; TODAY always looks alive so the demo (and
+  // the presence/muster view) never opens on a dead screen.
+  const weekend = (dow === 0 || dow === 6) && !isToday;
+
+  return MOCK_MEMBERS.map((m, idx) => {
+    const i = idx + (seed % 13); // per-date shuffle of who is late/absent
     // Archived/suspended/visitors mostly absent; spread the rest.
     const inactive = m.status !== "active";
     const isVisitorOrContractor =
       m.member_type === "visitor" || m.member_type === "contractor";
 
     let status: AttendanceDay["status"];
-    if (inactive) status = "absent";
+    if (inactive || weekend) status = "absent";
     else if (i % 9 === 4) status = "absent";
     else if (i % 7 === 3) status = "late";
-    else if (i % 11 === 6) status = "incomplete";
+    else if (isToday && i % 11 === 6) status = "incomplete";
     else status = "present";
 
-    if (isVisitorOrContractor && i % 2 === 0) status = "absent";
+    if (!weekend && isVisitorOrContractor && i % 2 === 0) status = "absent";
 
     if (status === "absent") {
       return {
         member_id: m.id,
         member_name: m.full_name,
         department: m.department,
-        work_date: WORKDAY,
+        work_date: dateISO,
         is_late: false,
         status,
       };
     }
 
     const baseInMin = status === "late" ? 9 * 60 + 28 + (i % 20) : 8 * 60 + 35 + (i % 25);
-    const inDate = new Date(`${WORKDAY}T00:00:00`);
+    const inDate = new Date(`${dateISO}T00:00:00`);
     inDate.setMinutes(baseInMin);
 
     const hasOut = status !== "incomplete";
@@ -246,7 +283,7 @@ function makeAttendance(): AttendanceDay[] {
       member_id: m.id,
       member_name: m.full_name,
       department: m.department,
-      work_date: WORKDAY,
+      work_date: dateISO,
       first_in_ts: inDate.toISOString(),
       last_out_ts: hasOut ? outDate.toISOString() : undefined,
       worked_seconds: worked,
@@ -257,6 +294,45 @@ function makeAttendance(): AttendanceDay[] {
 }
 
 export const MOCK_ATTENDANCE: AttendanceDay[] = makeAttendance();
+
+/**
+ * Date-aware mock for GET /api/attendance: honors `date`, `from`/`to` ranges,
+ * and `member_id`, mirroring the live API's selection semantics.
+ */
+export function mockAttendanceFor(params: {
+  date?: string;
+  from?: string;
+  to?: string;
+  member_id?: string;
+} = {}): AttendanceDay[] {
+  let rows: AttendanceDay[];
+  if (params.from && params.to && params.from !== params.to) {
+    rows = [];
+    // Walk the range (bounded to 92 days like the API) newest-first.
+    const start = new Date(`${params.from}T12:00:00`);
+    const end = new Date(`${params.to}T12:00:00`);
+    for (let d = new Date(end), n = 0; d >= start && n < 92; d.setDate(d.getDate() - 1), n++) {
+      rows.push(...makeAttendance(d.toISOString().slice(0, 10)));
+    }
+  } else {
+    rows = makeAttendance(params.date ?? params.from ?? WORKDAY);
+  }
+  if (params.member_id) rows = rows.filter((r) => r.member_id === params.member_id);
+  return rows;
+}
+
+/**
+ * "Still on site" rule shared by the dashboard stat and /presence: the person
+ * clocked in today and either has no out yet, or their (mock) out time is still
+ * in the future — so during the working day most present people are on site,
+ * and in the evening the list drains naturally.
+ */
+function isOnSiteNow(a: AttendanceDay): boolean {
+  if (!a.first_in_ts || a.status === "absent") return false;
+  if (new Date(a.first_in_ts).getTime() > Date.now()) return false;
+  if (!a.last_out_ts) return true;
+  return new Date(a.last_out_ts).getTime() > Date.now();
+}
 
 // --------------------------------------------------------------------------
 // Access events — a backlog plus a generator for the live stream.
@@ -337,10 +413,8 @@ export function mockTodayStats(): TodayStats {
     (e) => e.decision !== "granted" && new Date(e.ts).toDateString() === new Date().toDateString(),
   ).length;
 
-  // On-site now: present/late/incomplete that have an in but no out yet.
-  const onSiteNow = MOCK_ATTENDANCE.filter(
-    (a) => a.first_in_ts && !a.last_out_ts && a.status !== "absent",
-  ).length;
+  // On-site now: entered and not yet left (their last-out is still ahead).
+  const onSiteNow = MOCK_ATTENDANCE.filter(isOnSiteNow).length;
 
   // Hourly entries curve — a believable office day (peak 8-9, dip midday).
   const shape = [0, 0, 0, 0, 0, 0, 1, 4, 14, 9, 5, 6, 8, 7, 5, 4, 6, 9, 7, 3, 1, 1, 0, 0];
@@ -370,6 +444,7 @@ export const MOCK_BRANDING: Branding = {
   accent_color: "#E0A340",
   logo_url: null,
   locale: "fr",
+  terminology: "workforce",
 };
 
 export const MOCK_SETTINGS: Settings = {
@@ -394,35 +469,78 @@ export function putMockSettings(next: Settings): Settings {
 }
 
 // --------------------------------------------------------------------------
-// Access groups — minimal demo set so the member edit form's selector works.
-// (schema.sql defines the table; the Console only needs id + name here.)
+// Access groups — full CRUD demo set (doors + per-day schedule windows).
+// `door_ids` empty ⇒ all doors; `schedule` {} ⇒ any time.
 // --------------------------------------------------------------------------
 export const MOCK_ACCESS_GROUPS: AccessGroup[] = [
-  { id: uuid(301), name: "Accès complet", door_ids: [], created_at: iso(-1000 * 60 * 60 * 24 * 120) },
+  {
+    id: uuid(301),
+    name: "Accès complet",
+    door_ids: [],
+    schedule: {},
+    created_at: iso(-1000 * 60 * 60 * 24 * 120),
+  },
   {
     id: uuid(302),
     name: "Employés — Bureaux",
     door_ids: [MOCK_DOORS[0].id, MOCK_DOORS[1].id],
+    schedule: {},
     created_at: iso(-1000 * 60 * 60 * 24 * 110),
   },
   {
     id: uuid(303),
     name: "Direction & Coffres",
     door_ids: [MOCK_DOORS[0].id, MOCK_DOORS[2].id],
+    schedule: {},
     created_at: iso(-1000 * 60 * 60 * 24 * 90),
   },
   {
     id: uuid(304),
     name: "Prestataires — Heures ouvrées",
     door_ids: [MOCK_DOORS[0].id],
+    schedule: {
+      mon: ["08:00", "18:00"],
+      tue: ["08:00", "18:00"],
+      wed: ["08:00", "18:00"],
+      thu: ["08:00", "18:00"],
+      fri: ["08:00", "17:00"],
+    },
     created_at: iso(-1000 * 60 * 60 * 24 * 60),
   },
 ];
 
-let liveAccessGroups: AccessGroup[] = [...MOCK_ACCESS_GROUPS];
+let liveAccessGroups: AccessGroup[] = MOCK_ACCESS_GROUPS.map((g) => ({ ...g }));
 
 export function getMockAccessGroups(): AccessGroup[] {
-  return [...liveAccessGroups];
+  return liveAccessGroups.map((g) => ({ ...g }));
+}
+
+export function addMockAccessGroup(draft: AccessGroupDraft): AccessGroup {
+  const group: AccessGroup = {
+    id: mockId(),
+    name: draft.name,
+    door_ids: [...draft.door_ids],
+    schedule: { ...draft.schedule },
+    created_at: new Date().toISOString(),
+  };
+  liveAccessGroups = [...liveAccessGroups, group];
+  return { ...group };
+}
+
+export function updateMockAccessGroup(id: string, patch: Partial<AccessGroupDraft>): AccessGroup {
+  const idx = liveAccessGroups.findIndex((g) => g.id === id);
+  if (idx === -1) throw new Error("Access group not found");
+  const next: AccessGroup = { ...liveAccessGroups[idx], ...patch, id };
+  liveAccessGroups = liveAccessGroups.map((g) => (g.id === id ? next : g));
+  return { ...next };
+}
+
+export function deleteMockAccessGroup(id: string): void {
+  liveAccessGroups = liveAccessGroups.filter((g) => g.id !== id);
+  // Members referencing the group lose it (schema: ON DELETE SET NULL).
+  liveMembers = liveMembers.map((m) =>
+    m.access_group_id === id ? { ...m, access_group_id: undefined } : m,
+  );
 }
 
 // --------------------------------------------------------------------------
@@ -512,4 +630,420 @@ export function updateMockCamera(id: string, patch: Partial<Camera>): Camera {
 
 export function deleteMockCamera(id: string): void {
   liveCameras = liveCameras.filter((c) => c.id !== id);
+}
+
+// ===========================================================================
+// v2 — users, alerts, audit, reports, presence
+// ===========================================================================
+
+// --------------------------------------------------------------------------
+// Operator users — the Console team (admin / operator / viewer).
+// The signed-in demo operator is admin@liwan.local (see api.ts `me()`).
+// --------------------------------------------------------------------------
+export const MOCK_SELF_EMAIL = "admin@liwan.local";
+
+const SEED_USERS: OperatorUser[] = [
+  {
+    id: uuid(401),
+    email: MOCK_SELF_EMAIL,
+    full_name: "Administrateur",
+    role: "admin",
+    created_at: iso(-1000 * 60 * 60 * 24 * 180),
+  },
+  {
+    id: uuid(402),
+    email: "s.tazi@entreprise.ma",
+    full_name: "Salma Tazi",
+    role: "operator",
+    created_at: iso(-1000 * 60 * 60 * 24 * 120),
+  },
+  {
+    id: uuid(403),
+    email: "o.benjelloun@entreprise.ma",
+    full_name: "Omar Benjelloun",
+    role: "operator",
+    created_at: iso(-1000 * 60 * 60 * 24 * 90),
+  },
+  {
+    id: uuid(404),
+    email: "n.bennani@entreprise.ma",
+    full_name: "Nadia Bennani",
+    role: "viewer",
+    created_at: iso(-1000 * 60 * 60 * 24 * 45),
+  },
+];
+
+let liveUsers: OperatorUser[] = SEED_USERS.map((u) => ({ ...u }));
+
+export function getMockUsers(): OperatorUser[] {
+  return liveUsers.map((u) => ({ ...u }));
+}
+
+export function addMockUser(draft: UserDraft): OperatorUser {
+  if (liveUsers.some((u) => u.email.toLowerCase() === draft.email.toLowerCase())) {
+    throw new Error("Un utilisateur avec cet e-mail existe déjà.");
+  }
+  const user: OperatorUser = {
+    id: mockId(),
+    email: draft.email,
+    full_name: draft.full_name || undefined,
+    role: draft.role,
+    created_at: new Date().toISOString(),
+  };
+  liveUsers = [...liveUsers, user];
+  appendMockAudit("user.create", "user", user.id, { email: user.email, role: user.role });
+  return { ...user };
+}
+
+export function updateMockUser(id: string, patch: UserPatch): OperatorUser {
+  const idx = liveUsers.findIndex((u) => u.id === id);
+  if (idx === -1) throw new Error("User not found");
+  const next: OperatorUser = {
+    ...liveUsers[idx],
+    full_name: patch.full_name !== undefined ? patch.full_name || undefined : liveUsers[idx].full_name,
+    role: patch.role ?? liveUsers[idx].role,
+  };
+  liveUsers = liveUsers.map((u) => (u.id === id ? next : u));
+  appendMockAudit("user.update", "user", id, { email: next.email, role: next.role });
+  return { ...next };
+}
+
+/** Throws with a human message on self-delete / last-admin (API returns 409). */
+export function deleteMockUser(id: string): void {
+  const user = liveUsers.find((u) => u.id === id);
+  if (!user) throw new Error("User not found");
+  if (user.email === MOCK_SELF_EMAIL) {
+    throw new Error("Vous ne pouvez pas supprimer votre propre compte.");
+  }
+  if (user.role === "admin" && liveUsers.filter((u) => u.role === "admin").length <= 1) {
+    throw new Error("Impossible de supprimer le dernier administrateur.");
+  }
+  liveUsers = liveUsers.filter((u) => u.id !== id);
+  appendMockAudit("user.delete", "user", id, { email: user.email });
+}
+
+// --------------------------------------------------------------------------
+// Alerts — a believable backlog derived from the non-granted event history,
+// plus live creation from the SSE simulation (see recordMockAlert).
+// --------------------------------------------------------------------------
+const ALERT_SEVERITY: Record<AlertKind, Alert["severity"]> = {
+  unknown_face: "critical",
+  not_authorized: "warning",
+  off_schedule: "warning",
+  system: "info",
+};
+
+const ALERT_MESSAGE: Record<AlertKind, (doorName?: string) => string> = {
+  unknown_face: (d) => `Visage inconnu détecté${d ? ` — ${d}` : ""}`,
+  not_authorized: (d) => `Tentative d'accès non autorisée${d ? ` — ${d}` : ""}`,
+  off_schedule: (d) => `Accès hors horaire${d ? ` — ${d}` : ""}`,
+  system: () => "Anomalie système",
+};
+
+let alertCounter = 9_000;
+
+function alertFromEvent(ev: AccessEvent, acknowledged: boolean): Alert {
+  const kind: AlertKind =
+    ev.decision === "unknown_face" || ev.decision === "not_authorized" || ev.decision === "off_schedule"
+      ? ev.decision
+      : "not_authorized"; // "denied" folds into not_authorized for the demo
+  return {
+    id: alertCounter++,
+    ts: ev.ts,
+    kind,
+    severity: ALERT_SEVERITY[kind],
+    message: ALERT_MESSAGE[kind](ev.door_name),
+    event_id: ev.id,
+    door_id: ev.door_id,
+    door_name: ev.door_name,
+    member_id: ev.member_id,
+    member_name: kind === "unknown_face" ? undefined : ev.member_name,
+    acknowledged,
+    acknowledged_by_email: acknowledged ? MOCK_SELF_EMAIL : undefined,
+    acknowledged_at: acknowledged ? ev.ts : undefined,
+  };
+}
+
+// Seed: every non-granted backlog event becomes an alert; older ones are
+// already acknowledged so the list shows both states. Plus one system alert.
+let liveAlerts: Alert[] = [
+  ...MOCK_EVENTS.filter((e) => e.decision !== "granted").map((e, i) =>
+    alertFromEvent(e, i >= 4),
+  ),
+  {
+    id: alertCounter++,
+    ts: iso(-1000 * 60 * 60 * 26),
+    kind: "system" as const,
+    severity: "info" as const,
+    message: "Caméra « Cam Parking » reconnectée après une coupure réseau",
+    door_id: MOCK_DOORS[1].id,
+    door_name: MOCK_DOORS[1].name,
+    acknowledged: true,
+    acknowledged_by_email: MOCK_SELF_EMAIL,
+    acknowledged_at: iso(-1000 * 60 * 60 * 25),
+  },
+].sort((a, b) => +new Date(b.ts) - +new Date(a.ts));
+
+export function getMockAlerts(query: AlertQuery = {}): Alert[] {
+  let out = liveAlerts.map((a) => ({ ...a }));
+  if (query.acknowledged !== undefined) out = out.filter((a) => a.acknowledged === query.acknowledged);
+  if (query.kind) out = out.filter((a) => a.kind === query.kind);
+  if (query.limit) out = out.slice(0, query.limit);
+  return out;
+}
+
+export function getMockAlertCount(): { unacknowledged: number } {
+  return { unacknowledged: liveAlerts.filter((a) => !a.acknowledged).length };
+}
+
+export function ackMockAlert(id: number): Alert {
+  const idx = liveAlerts.findIndex((a) => a.id === id);
+  if (idx === -1) throw new Error("Alert not found");
+  const next: Alert = {
+    ...liveAlerts[idx],
+    acknowledged: true,
+    acknowledged_by_email: MOCK_SELF_EMAIL,
+    acknowledged_at: new Date().toISOString(),
+  };
+  liveAlerts = liveAlerts.map((a) => (a.id === id ? next : a));
+  appendMockAudit("alerts.ack", "alert", String(id), { kind: next.kind });
+  return { ...next };
+}
+
+export function ackAllMockAlerts(): { acknowledged: number } {
+  const now = new Date().toISOString();
+  const count = liveAlerts.filter((a) => !a.acknowledged).length;
+  liveAlerts = liveAlerts.map((a) =>
+    a.acknowledged
+      ? a
+      : { ...a, acknowledged: true, acknowledged_by_email: MOCK_SELF_EMAIL, acknowledged_at: now },
+  );
+  if (count > 0) appendMockAudit("alerts.ack", "alert", "all", { acknowledged: count });
+  return { acknowledged: count };
+}
+
+/**
+ * Live-stream hook: a fresh non-granted event just "happened" — persist the
+ * matching alert so /alerts, the bell badge, and the stream stay consistent.
+ */
+export function recordMockAlert(ev: AccessEvent): Alert {
+  const alert = alertFromEvent(ev, false);
+  liveAlerts = [alert, ...liveAlerts];
+  return { ...alert };
+}
+
+// --------------------------------------------------------------------------
+// Audit log — append-only trail of operator actions.
+// --------------------------------------------------------------------------
+let auditCounter = 70_000;
+
+function seedAudit(): AuditEntry[] {
+  const actors = [MOCK_SELF_EMAIL, "s.tazi@entreprise.ma", "o.benjelloun@entreprise.ma"];
+  const rows: Omit<AuditEntry, "id" | "ts">[] = [
+    { user_email: actors[0], action: "login", entity: "user", details: { ip: "10.0.0.4" } },
+    { user_email: actors[0], action: "settings.update", entity: "settings", entity_id: "branding", details: { changed: ["accent_color"] } },
+    { user_email: actors[1], action: "member.create", entity: "member", entity_id: MOCK_MEMBERS[15].id, details: { full_name: MOCK_MEMBERS[15].full_name } },
+    { user_email: actors[1], action: "member.update", entity: "member", entity_id: MOCK_MEMBERS[7].id, details: { changed: ["department"] } },
+    { user_email: actors[2], action: "login", entity: "user", details: { ip: "10.0.0.12" } },
+    { user_email: actors[0], action: "door.open", entity: "door", entity_id: MOCK_DOORS[0].id, details: { name: MOCK_DOORS[0].name, manual: true } },
+    { user_email: actors[1], action: "alerts.ack", entity: "alert", entity_id: "9003", details: { kind: "unknown_face" } },
+    { user_email: actors[0], action: "access_group.update", entity: "access_group", entity_id: MOCK_ACCESS_GROUPS[3].id, details: { changed: ["schedule"] } },
+    { user_email: actors[0], action: "user.create", entity: "user", details: { email: "n.bennani@entreprise.ma", role: "viewer" } },
+    { user_email: actors[1], action: "member.import", entity: "member", details: { created: 12, skipped: 2 } },
+    { user_email: actors[2], action: "login", entity: "user", details: { ip: "10.0.0.12" } },
+    { user_email: actors[0], action: "camera.update", entity: "camera", entity_id: MOCK_CAMERAS[2].id, details: { changed: ["recognition_threshold"] } },
+    { user_email: actors[1], action: "member.update", entity: "member", entity_id: MOCK_MEMBERS[17].id, details: { changed: ["status"], status: "suspended" } },
+    { user_email: actors[0], action: "door.update", entity: "door", entity_id: MOCK_DOORS[3].id, details: { changed: ["enabled"], enabled: false } },
+    { user_email: actors[0], action: "login", entity: "user", details: { ip: "10.0.0.4" } },
+    { user_email: actors[1], action: "member.delete", entity: "member", details: { full_name: "Test Démo" } },
+    { user_email: actors[0], action: "access_group.create", entity: "access_group", entity_id: MOCK_ACCESS_GROUPS[3].id, details: { name: MOCK_ACCESS_GROUPS[3].name } },
+    { user_email: actors[2], action: "login", entity: "user", details: { ip: "10.0.0.31" } },
+  ];
+  // Spread the rows over the last ~10 days, most recent first.
+  return rows.map((r, i) => ({
+    id: auditCounter++,
+    ts: iso(-1000 * 60 * (37 + i * 41 * 19)),
+    ...r,
+  }));
+}
+
+let liveAudit: AuditEntry[] = seedAudit().sort((a, b) => +new Date(b.ts) - +new Date(a.ts));
+
+export function getMockAudit(query: AuditQuery = {}): AuditEntry[] {
+  let out = liveAudit.map((a) => ({ ...a }));
+  if (query.action) out = out.filter((a) => a.action === query.action);
+  if (query.user) {
+    const q = query.user.toLowerCase();
+    out = out.filter((a) => a.user_email?.toLowerCase().includes(q));
+  }
+  return out.slice(0, query.limit ?? 100);
+}
+
+/** Append an audit row (mock mutations call this so the trail stays alive). */
+export function appendMockAudit(
+  action: string,
+  entity?: string,
+  entity_id?: string,
+  details: Record<string, unknown> = {},
+): AuditEntry {
+  const entry: AuditEntry = {
+    id: auditCounter++,
+    ts: new Date().toISOString(),
+    user_email: MOCK_SELF_EMAIL,
+    action,
+    entity,
+    entity_id,
+    details,
+  };
+  liveAudit = [entry, ...liveAudit];
+  return { ...entry };
+}
+
+// --------------------------------------------------------------------------
+// Reports — deterministic aggregates over an arbitrary [from, to] range,
+// derived from the member roster so every view stays internally consistent.
+// --------------------------------------------------------------------------
+
+/** Small deterministic hash for (string) seeds — stable across renders. */
+function seededInt(seed: string, mod: number): number {
+  let h = 2166136261;
+  for (let i = 0; i < seed.length; i++) {
+    h ^= seed.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return Math.abs(h) % mod;
+}
+
+function isWeekend(dateISO: string): boolean {
+  const d = new Date(`${dateISO}T12:00:00`).getDay();
+  return d === 0 || d === 6;
+}
+
+/** Inclusive list of ISO dates between from and to (bounded to 366 days). */
+function dateRange(from: string, to: string): string[] {
+  const out: string[] = [];
+  let cur = from;
+  for (let i = 0; i < 366 && cur <= to; i++) {
+    out.push(cur);
+    cur = shiftDate(cur, 1);
+  }
+  return out;
+}
+
+/** Workforce eligible for daily attendance in the mock reports. */
+function reportRoster(): Member[] {
+  return liveMembers.filter((m) => m.status === "active");
+}
+
+function dailyBreakdown(dateISO: string): ReportsDaily {
+  const roster = reportRoster();
+  const n = roster.length;
+  if (isWeekend(dateISO)) {
+    const skeleton = seededInt(`${dateISO}-we`, 3); // a guard or two
+    return { date: dateISO, present: skeleton, late: 0, absent: n - skeleton };
+  }
+  const absent = 1 + seededInt(`${dateISO}-abs`, Math.max(2, Math.round(n * 0.15)));
+  const late = 1 + seededInt(`${dateISO}-late`, Math.max(2, Math.round(n * 0.2)));
+  const present = Math.max(0, n - absent - late);
+  return { date: dateISO, present, late, absent };
+}
+
+export function mockReportsSummary(from: string, to: string): ReportsSummary {
+  const days = dateRange(from, to);
+  const daily = days.map(dailyBreakdown);
+  const workdays = daily.filter((d) => !isWeekend(d.date));
+  const base = workdays.length > 0 ? workdays : daily;
+  const sum = (f: (d: ReportsDaily) => number) => base.reduce((s, d) => s + f(d), 0);
+  const avg = (f: (d: ReportsDaily) => number) =>
+    base.length > 0 ? sum(f) / base.length : 0;
+  const attended = sum((d) => d.present + d.late);
+  return {
+    days: days.length,
+    avg_present: Math.round(avg((d) => d.present) * 10) / 10,
+    avg_late: Math.round(avg((d) => d.late) * 10) / 10,
+    avg_absent: Math.round(avg((d) => d.absent) * 10) / 10,
+    punctuality_rate: attended > 0 ? sum((d) => d.present) / attended : 1,
+    avg_worked_seconds: 7 * 3600 + 50 * 60 + seededInt(`${from}${to}`, 45) * 60,
+    daily,
+  };
+}
+
+export function mockReportsDepartments(from: string, to: string): DepartmentReport[] {
+  const workdays = dateRange(from, to).filter((d) => !isWeekend(d)).length || 1;
+  const byDept = new Map<string, Member[]>();
+  for (const m of reportRoster()) {
+    const dept = m.department || "—";
+    byDept.set(dept, [...(byDept.get(dept) ?? []), m]);
+  }
+  return Array.from(byDept.entries())
+    .map(([department, members]) => {
+      const slots = members.length * workdays;
+      const late_days = seededInt(`${department}-${from}-l`, Math.max(2, Math.round(slots * 0.12)));
+      const absent_days = seededInt(`${department}-${from}-a`, Math.max(2, Math.round(slots * 0.09)));
+      return {
+        department,
+        members: members.length,
+        present_days: Math.max(0, slots - late_days - absent_days),
+        late_days,
+        absent_days,
+        avg_worked_seconds: 7 * 3600 + 30 * 60 + seededInt(`${department}-h`, 80) * 60,
+      };
+    })
+    .sort((a, b) => b.members - a.members);
+}
+
+export function mockReportsMembers(
+  from: string,
+  to: string,
+  sort: ReportSort = "late",
+  limit = 15,
+): MemberReport[] {
+  const workdays = dateRange(from, to).filter((d) => !isWeekend(d)).length || 1;
+  const rows: MemberReport[] = reportRoster().map((m) => {
+    const late_days = seededInt(`${m.id}-${from}-l`, Math.max(2, Math.round(workdays * 0.45)));
+    const absent_days = seededInt(`${m.id}-${from}-a`, Math.max(2, Math.round(workdays * 0.25)));
+    const present_days = Math.max(0, workdays - late_days - absent_days);
+    const attendedDays = present_days + late_days;
+    const arrivalMin = 8 * 60 + 25 + seededInt(`${m.id}-arr`, 70);
+    return {
+      member_id: m.id,
+      member_name: m.full_name,
+      department: m.department,
+      present_days,
+      late_days,
+      absent_days,
+      avg_arrival:
+        attendedDays > 0
+          ? `${String(Math.floor(arrivalMin / 60)).padStart(2, "0")}:${String(arrivalMin % 60).padStart(2, "0")}`
+          : null,
+      total_worked_seconds: attendedDays * (7 * 3600 + 40 * 60 + seededInt(`${m.id}-w`, 50) * 60),
+    };
+  });
+  const cmp: Record<ReportSort, (a: MemberReport, b: MemberReport) => number> = {
+    late: (a, b) => b.late_days - a.late_days,
+    hours: (a, b) => b.total_worked_seconds - a.total_worked_seconds,
+    absences: (a, b) => b.absent_days - a.absent_days,
+  };
+  return rows.sort(cmp[sort]).slice(0, limit);
+}
+
+// --------------------------------------------------------------------------
+// Presence — who is on site right now, derived from today's attendance.
+// --------------------------------------------------------------------------
+export function mockPresenceNow(): PresenceNow {
+  const memberById = new Map(liveMembers.map((m) => [m.id, m]));
+  const people = MOCK_ATTENDANCE.filter(isOnSiteNow)
+    .map((a, i) => {
+      const member = memberById.get(a.member_id);
+      return {
+        member_id: a.member_id,
+        member_name: a.member_name,
+        department: a.department,
+        member_type: member?.member_type ?? ("employee" as const),
+        first_in_ts: a.first_in_ts as string,
+        first_in_door_name: MOCK_DOORS[i % 2].name, // the two street-level doors
+      };
+    })
+    .sort((a, b) => +new Date(a.first_in_ts) - +new Date(b.first_in_ts));
+  return { count: people.length, people };
 }

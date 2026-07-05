@@ -1,9 +1,9 @@
 # ===========================================================================
 # LIWAN — Face Attendance & Access Control
-# Full on-prem stack: CompreFace engine + Liwan app. Runs on a single CPU box.
+# Full on-prem stack: Liwan Vision Engine + Liwan app. Runs on a single CPU box.
 #   docker compose up -d
 # Ports:
-#   8000  CompreFace admin UI (enrolment fallback / engine config)
+#   8000  Vision engine console (enrolment fallback / engine config)
 #   8088  Liwan API (FastAPI)
 #   3000  Liwan Console (admin dashboard)
 #   3001  Liwan Gate (door kiosk)
@@ -17,7 +17,9 @@ networks:
   liwan:
 
 services:
-  # ---- CompreFace engine (recognition core) --------------------------------
+  # ---- Liwan Vision Engine (recognition core) -------------------------------
+  # Image values point at the upstream registry that ships the engine runtime
+  # images (implementation detail; see NOTICE for third-party attribution).
   liwan-postgres-db:
     image: ${registry}compreface-postgres-db:${POSTGRES_VERSION}
     container_name: liwan-postgres-db
@@ -31,25 +33,27 @@ services:
       - ./db/schema.sql:/docker-entrypoint-initdb.d/10-liwan-schema.sql:ro
     networks: [liwan]
 
-  liwan-compreface-admin:
+  liwan-engine-admin:
+    # Liwan Vision Engine runtime image (management service).
     image: ${registry}compreface-admin:${ADMIN_VERSION}
-    container_name: liwan-compreface-admin
+    container_name: liwan-engine-admin
     restart: always
-    depends_on: [liwan-postgres-db, liwan-compreface-api]
+    depends_on: [liwan-postgres-db, liwan-engine-api]
     environment:
       - POSTGRES_USER=${postgres_username}
       - POSTGRES_PASSWORD=${postgres_password}
       - POSTGRES_URL=jdbc:postgresql://${postgres_domain}:${postgres_port}/${postgres_db}
       - SPRING_PROFILES_ACTIVE=dev
       - ENABLE_EMAIL_SERVER=${enable_email_server}
-      - ADMIN_JAVA_OPTS=${compreface_admin_java_options}
+      - ADMIN_JAVA_OPTS=${engine_admin_java_options}
       - MAX_FILE_SIZE=${max_file_size}
       - MAX_REQUEST_SIZE=${max_request_size}B
     networks: [liwan]
 
-  liwan-compreface-api:
+  liwan-engine-api:
+    # Liwan Vision Engine runtime image (recognition REST API).
     image: ${registry}compreface-api:${API_VERSION}
-    container_name: liwan-compreface-api
+    container_name: liwan-engine-api
     restart: always
     depends_on: [liwan-postgres-db]
     environment:
@@ -57,7 +61,7 @@ services:
       - POSTGRES_PASSWORD=${postgres_password}
       - POSTGRES_URL=jdbc:postgresql://${postgres_domain}:${postgres_port}/${postgres_db}
       - SPRING_PROFILES_ACTIVE=dev
-      - API_JAVA_OPTS=${compreface_api_java_options}
+      - API_JAVA_OPTS=${engine_api_java_options}
       - SAVE_IMAGES_TO_DB=${save_images_to_db}
       - MAX_FILE_SIZE=${max_file_size}
       - MAX_REQUEST_SIZE=${max_request_size}B
@@ -65,9 +69,10 @@ services:
       - READ_TIMEOUT=${read_timeout:-60000}
     networks: [liwan]
 
-  liwan-compreface-core:
+  liwan-engine-core:
+    # Liwan Vision Engine runtime image (ML inference, CPU-only).
     image: ${registry}compreface-core:${CORE_VERSION}
-    container_name: liwan-compreface-core
+    container_name: liwan-engine-core
     restart: always
     environment:
       - ML_PORT=3000
@@ -77,11 +82,12 @@ services:
       - PYTHONUNBUFFERED=1
     networks: [liwan]
 
-  liwan-compreface-fe:
+  liwan-engine-ui:
+    # Liwan Vision Engine runtime image (engine console at :8000).
     image: ${registry}compreface-fe:${FE_VERSION}
-    container_name: liwan-compreface-fe
+    container_name: liwan-engine-ui
     restart: always
-    depends_on: [liwan-compreface-api, liwan-compreface-admin]
+    depends_on: [liwan-engine-api, liwan-engine-admin]
     ports:
       - "8000:80"
     environment:
@@ -92,18 +98,24 @@ services:
 
   # ---- Liwan application layer --------------------------------------------
   liwan-api:
-    build: ./services/api
+    build:
+      # Repo root context so the image bundles db/ (schema + migrations) for
+      # self-healing startup migrations.
+      context: .
+      dockerfile: services/api/Dockerfile
     container_name: liwan-api
     restart: unless-stopped
-    depends_on: [liwan-postgres-db, liwan-compreface-api]
+    depends_on: [liwan-postgres-db, liwan-engine-api]
     environment:
       - DB_HOST=${postgres_domain}
       - DB_PORT=${postgres_port}
       - DB_NAME=${postgres_db}
       - DB_USER=${postgres_username}
       - DB_PASSWORD=${postgres_password}
-      - COMPREFACE_API_URL=${COMPREFACE_API_URL}
-      - COMPREFACE_API_KEY=${COMPREFACE_API_KEY}
+      # Vision-engine connection (the API itself also accepts legacy variable
+      # names from an older .env, so upgrades need no compose edits).
+      - ENGINE_URL=${ENGINE_URL:-http://liwan-engine-api:8080}
+      - ENGINE_API_KEY=${ENGINE_API_KEY:-}
       - LIWAN_JWT_SECRET=${LIWAN_JWT_SECRET}
       - LIWAN_ADMIN_EMAIL=${LIWAN_ADMIN_EMAIL}
       - LIWAN_ADMIN_PASSWORD=${LIWAN_ADMIN_PASSWORD}

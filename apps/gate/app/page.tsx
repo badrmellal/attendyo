@@ -235,11 +235,16 @@ export default function GatePage() {
         )}
       </section>
 
-      {/* Footer: tagline wordmark, quiet. */}
-      <footer className="relative z-10 flex items-center justify-center pb-7 sm:pb-9">
+      {/* Footer: tagline wordmark + a quiet on-prem privacy line while idle. */}
+      <footer className="relative z-10 flex flex-col items-center justify-center gap-1.5 pb-7 sm:pb-9">
         {branding.tagline && (
           <p className="text-center text-xs font-medium uppercase tracking-[0.22em] text-text-muted/70">
             {branding.tagline}
+          </p>
+        )}
+        {phase === "idle" && (
+          <p className="text-center text-[0.7rem] font-medium text-text-muted/50">
+            {strings.privacyLine}
           </p>
         )}
       </footer>
