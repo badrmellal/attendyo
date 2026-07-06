@@ -1,11 +1,11 @@
 "use client";
 
 /**
- * BrandLogo — the watchful-gate aperture mark + wordmark.
+ * BrandLogo — the Check Gate mark + wordmark.
  *
  * The glyph is inline SVG so it recolors from the live `--primary` token (set by
  * BrandingProvider). The wordmark text is the branding `product_name`, never a
- * hard-coded "Liwan". If the operator configures a `logo_url`, we show that
+ * hard-coded "Attendyo". If the operator configures a `logo_url`, we show that
  * image instead — this is the white-label escape hatch.
  */
 
@@ -20,9 +20,10 @@ type Props = {
 };
 
 export function BrandMark({ size = 28, className }: { size?: number; className?: string }) {
-  // The iwan — a horseshoe Moroccan arch with a recognised "face" dot at its
-  // heart. Inline SVG so it recolors from the live --primary / --primary-2
-  // tokens (set by BrandingProvider). The arch motif is the brand's through-line.
+  // The Check Gate — a soft rounded doorway with a checkmark resolving at its
+  // heart. Inline SVG so it recolors from the live --primary / --accent tokens
+  // (set by BrandingProvider). This exact path is shared verbatim with the
+  // Gate app's favicon so the mark is pixel-identical everywhere.
   const height = Math.round((size * 28) / 24);
   return (
     <svg
@@ -34,28 +35,21 @@ export function BrandMark({ size = 28, className }: { size?: number; className?:
       aria-hidden="true"
       className={cn("text-primary", className)}
     >
-      <defs>
-        <linearGradient id="liwan-arch" x1="4" y1="3" x2="20" y2="27" gradientUnits="userSpaceOnUse">
-          <stop stopColor="rgb(var(--primary))" />
-          <stop offset="1" stopColor="rgb(var(--primary-2))" />
-        </linearGradient>
-      </defs>
-      {/* Outer horseshoe arch */}
+      {/* The gate: a soft rounded doorway, not a horseshoe arch */}
       <path
-        d="M4 27 V12.5 C4 6.7 7.6 3 12 3 C16.4 3 20 6.7 20 12.5 V27"
-        stroke="url(#liwan-arch)"
+        d="M4 26 V11 C4 6.6 7.6 3 12 3 C16.4 3 20 6.6 20 11 V26"
+        stroke="currentColor"
         strokeWidth="2"
         strokeLinecap="round"
       />
-      {/* Inner arch — the recessed threshold */}
+      {/* The check: resolving inside it */}
       <path
-        d="M8 27 V13 C8 9.5 9.8 7.4 12 7.4 C14.2 7.4 16 9.5 16 13 V27"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        opacity="0.45"
+        d="M8.3 15.6 L11 18.4 L16.2 12.4"
+        stroke="rgb(var(--accent))"
+        strokeWidth="2.3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
       />
-      {/* The recognised face at the centre */}
-      <circle cx="12" cy="12.2" r="2.1" fill="currentColor" />
     </svg>
   );
 }

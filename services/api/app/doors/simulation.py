@@ -13,7 +13,7 @@ from typing import Any
 from ..events_bus import bus
 from .base import DoorActionResult, DoorContext, DoorDriver
 
-logger = logging.getLogger("liwan.doors.simulation")
+logger = logging.getLogger("attendyo.doors.simulation")
 
 
 class SimulationDriver(DoorDriver):

@@ -2,7 +2,7 @@
 
 > **These figures are SUGGESTED list prices for positioning and discussion — not a
 > binding quote.** Final pricing is set by the integrator/reseller per deal, region, and
-> scope. All amounts in **MAD** (Moroccan dirham) unless noted. Liwan is sold as a
+> scope. All amounts in **MAD** (Moroccan dirham) unless noted. Attendyo is sold as a
 > **one-time perpetual on-prem licence**; there is no mandatory subscription.
 
 ---
@@ -63,7 +63,7 @@ government, and any site that wants patches and help.
 | Data migration / bulk enrolment          | by volume                 |
 
 > Hardware (cameras, tablets, relays, strikes, the server) is **not** included in the
-> licence — buy commodity gear or let the integrator source it. Liwan runs on a plain CPU
+> licence — buy commodity gear or let the integrator source it. Attendyo runs on a plain CPU
 > box you likely already own.
 
 ---
@@ -73,11 +73,11 @@ government, and any site that wants patches and help.
 The dominant alternative in Morocco is **buying a face terminal per door** (e.g. ZKTeco
 uFace302 ≈ **850–5,500 MAD/device**, capped at ~3,000 faces each) and often paying for a
 **cloud time-attendance subscription** on top. That cost **grows with every door and every
-year**. Liwan is **one server, one fee, every door, forever.**
+year**. Attendyo is **one server, one fee, every door, forever.**
 
 **Worked example — a residence/office with 8 doors, 600 people, viewed over 5 years.**
 
-| | Per-terminal + cloud (illustrative) | Liwan (Business/Pro tier) |
+| | Per-terminal + cloud (illustrative) | Attendyo (Business/Pro tier) |
 |---|---|---|
 | Door terminals | 8 × ~3,500 MAD ≈ **28,000** | 0 (commodity cameras/tablets, bought once) |
 | Face capacity | ~3,000/terminal — **need to manage caps** | **Unlimited within tier** |
@@ -88,7 +88,7 @@ year**. Liwan is **one server, one fee, every door, forever.**
 
 The hardware-terminal route looks cheaper on day one for a couple of doors, but the
 **recurring SaaS line and the per-door multiplication** are where it loses over a 3–5 year
-horizon — and it can't match "data never leaves the building." Liwan's curve is **flat
+horizon — and it can't match "data never leaves the building." Attendyo's curve is **flat
 after purchase.**
 
 > Competitor figures (ZKTeco device price/cap, cloud attendance) are **public-market

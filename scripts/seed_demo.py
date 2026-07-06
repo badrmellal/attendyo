@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Seed the LIWAN database with a realistic demo dataset.
+"""Seed the ATTENDYO database with a realistic demo dataset.
 
 Run this against a running Postgres (the one in docker-compose) to populate:
 
@@ -14,8 +14,8 @@ Run this against a running Postgres (the one in docker-compose) to populate:
   so the live monitor, stats, reports, presence view and Gate have data.
 * Unacknowledged ``alerts`` linked to today's denied events (v2).
 * A few demo-tagged ``audit_log`` rows (v2).
-* Demo **operator** and **viewer** logins (operator@liwan.local / liwan-operator,
-  viewer@liwan.local / liwan-viewer) next to the admin.
+* Demo **operator** and **viewer** logins (operator@attendyo.local / attendyo-operator,
+  viewer@attendyo.local / attendyo-viewer) next to the admin.
 
 It is **safe to re-run**: the demo set is cleared and rebuilt each time, while
 real operator users and settings are left untouched. The admin operator is
@@ -27,7 +27,7 @@ Usage::
     python scripts/seed_demo.py
 
     # Or inside the API container:
-    docker compose exec liwan-api python -m scripts.seed_demo
+    docker compose exec attendyo-api python -m scripts.seed_demo
 
 Connection comes from the same environment variables the API uses
 (``DB_HOST``/``DB_PORT``/``DB_NAME``/``DB_USER``/``DB_PASSWORD``). When run on the
@@ -54,14 +54,14 @@ for _candidate in (_HERE / "services" / "api", _HERE):
 else:
     raise SystemExit(
         f"Could not locate the 'app' package near {_HERE} — run this from the "
-        "repo root or inside the liwan-api container."
+        "repo root or inside the attendyo-api container."
     )
 
 logging.basicConfig(
-    level=os.environ.get("LIWAN_LOG_LEVEL", "INFO"),
+    level=os.environ.get("ATTENDYO_LOG_LEVEL", "INFO"),
     format="%(asctime)s %(levelname)s %(name)s :: %(message)s",
 )
-logger = logging.getLogger("liwan.seed_demo")
+logger = logging.getLogger("attendyo.seed_demo")
 
 
 def main() -> int:
@@ -86,10 +86,10 @@ def main() -> int:
         summary.get("audit_rows", 0),
     )
     print(
-        "Demo data seeded. Log in with the configured LIWAN_ADMIN_EMAIL / "
-        "LIWAN_ADMIN_PASSWORD (default admin@liwan.local / liwan-admin).\n"
-        "Extra demo logins: operator@liwan.local / liwan-operator, "
-        "viewer@liwan.local / liwan-viewer."
+        "Demo data seeded. Log in with the configured ATTENDYO_ADMIN_EMAIL / "
+        "ATTENDYO_ADMIN_PASSWORD (default admin@attendyo.local / attendyo-admin).\n"
+        "Extra demo logins: operator@attendyo.local / attendyo-operator, "
+        "viewer@attendyo.local / attendyo-viewer."
     )
     return 0
 

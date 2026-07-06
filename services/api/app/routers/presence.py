@@ -20,7 +20,7 @@ from starlette.concurrency import run_in_threadpool
 from ..core import db, security
 from ..models.schemas import PresenceNow, PresencePerson
 
-logger = logging.getLogger("liwan.presence")
+logger = logging.getLogger("attendyo.presence")
 
 router = APIRouter(prefix="/api/presence", tags=["presence"])
 

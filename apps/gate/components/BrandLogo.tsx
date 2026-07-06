@@ -15,10 +15,12 @@ interface BrandLogoProps {
  * Brand wordmark for the kiosk.
  *
  * If branding.logo_url is set we render that (white-label customer logo).
- * Otherwise we draw the Liwan arch glyph — the horseshoe *iwan* with a
- * recognised "face" dot inside — recoloured from the ultramarine `--primary`
- * token, plus the product_name wordmark set in the Fraunces display serif.
- * Never hard-codes "Liwan": the text comes from branding.product_name.
+ * Otherwise we draw the Check Gate glyph — a minimal rounded doorway with a
+ * checkmark resolving at its centre — recoloured from the ultramarine
+ * `--primary` token, plus the product_name wordmark set in the Fraunces
+ * display serif. Never hard-codes "Attendyo": the text comes from
+ * branding.product_name. Path is verbatim from brand/BRAND.md so the mark is
+ * pixel-identical to the Console and the favicon.
  */
 export function BrandLogo({ branding, className, size = 30 }: BrandLogoProps) {
   if (branding.logo_url) {
@@ -41,7 +43,8 @@ export function BrandLogo({ branding, className, size = 30 }: BrandLogoProps) {
       className={cn("flex items-center gap-3", className)}
       aria-label={branding.product_name}
     >
-      {/* The Liwan arch (iwan) with a recognised face dot. Strokes use --primary. */}
+      {/* The Check Gate: a soft rounded doorway with a checkmark resolving inside
+          it. Strokes use --primary; verbatim path from brand/BRAND.md. */}
       <svg
         width={(size * 24) / 28}
         height={size}
@@ -51,19 +54,21 @@ export function BrandLogo({ branding, className, size = 30 }: BrandLogoProps) {
         className="text-primary"
         aria-hidden="true"
       >
+        {/* The gate: a soft rounded doorway, not a horseshoe arch */}
         <path
-          d="M4 27 V12.5 C4 6.7 7.6 3 12 3 C16.4 3 20 6.7 20 12.5 V27"
+          d="M4 26 V11 C4 6.6 7.6 3 12 3 C16.4 3 20 6.6 20 11 V26"
           stroke="currentColor"
           strokeWidth="2"
           strokeLinecap="round"
         />
+        {/* The check: resolving inside it */}
         <path
-          d="M8 27 V13 C8 9.5 9.8 7.4 12 7.4 C14.2 7.4 16 9.5 16 13 V27"
+          d="M8.3 15.6 L11 18.4 L16.2 12.4"
           stroke="currentColor"
-          strokeWidth="1.4"
-          opacity="0.45"
+          strokeWidth="2.3"
+          strokeLinecap="round"
+          strokeLinejoin="round"
         />
-        <circle cx="12" cy="12.2" r="2.1" fill="currentColor" />
       </svg>
       <span
         className="font-display text-text"

@@ -1,4 +1,4 @@
-"""Liwan Vision Engine client.
+"""Attendyo Vision Engine client.
 
 Thin, defensive ``httpx`` wrapper over the vision engine's REST API. The engine
 is the recognition core bundled in the same compose stack (see NOTICE for
@@ -26,7 +26,7 @@ import httpx
 
 from .config import get_settings
 
-logger = logging.getLogger("liwan.engine")
+logger = logging.getLogger("attendyo.engine")
 
 
 class EngineError(Exception):

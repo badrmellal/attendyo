@@ -2,7 +2,7 @@
 
 A small, dependency-light wrapper around ``psycopg2`` using a thread-safe
 ``SimpleConnectionPool``. Every connection has ``search_path`` pinned to the
-``liwan`` schema so callers never need to qualify table names.
+``attendyo`` schema so callers never need to qualify table names.
 
 All helpers are synchronous (psycopg2 is blocking). Routers must call them off
 the event loop via ``asyncio.to_thread`` / ``run_in_threadpool`` — never inline
@@ -22,7 +22,7 @@ from psycopg2.pool import SimpleConnectionPool
 
 from .config import get_settings
 
-logger = logging.getLogger("liwan.db")
+logger = logging.getLogger("attendyo.db")
 
 _pool: SimpleConnectionPool | None = None
 _pool_lock = threading.Lock()
@@ -40,7 +40,7 @@ def init_pool() -> None:
             maxconn=settings.db_max_conn,
             dsn=settings.dsn,
             # Pin search_path at connect time for every pooled connection.
-            options="-c search_path=liwan,public",
+            options="-c search_path=attendyo,public",
         )
         logger.info("Database pool initialised (%s..%s connections)",
                     settings.db_min_conn, settings.db_max_conn)
@@ -74,7 +74,7 @@ def get_conn() -> Iterator["psycopg2.extensions.connection"]:
     conn = pool.getconn()
     try:
         with conn.cursor() as cur:
-            cur.execute("SET search_path TO liwan, public")
+            cur.execute("SET search_path TO attendyo, public")
         yield conn
         conn.commit()
     except Exception:

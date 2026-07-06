@@ -28,7 +28,7 @@ from typing import Any, Optional
 
 from ..core import db
 
-logger = logging.getLogger("liwan.decision")
+logger = logging.getLogger("attendyo.decision")
 
 # Weekday keys used in access_group.schedule JSON, Monday-first.
 _WEEKDAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
@@ -173,7 +173,7 @@ def decide(
         (subject_name,),
     )
     if member is None:
-        # Engine knows the subject but Liwan has no member row for it.
+        # Engine knows the subject but Attendyo has no member row for it.
         return Decision(
             decision="unknown_face",
             direction=direction,

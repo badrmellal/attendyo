@@ -37,7 +37,7 @@ from ..services import decision as decision_service
 from . import alerts as alerts_router
 from . import settings as settings_router
 
-logger = logging.getLogger("liwan.recognize")
+logger = logging.getLogger("attendyo.recognize")
 
 router = APIRouter(prefix="/api", tags=["recognition"])
 
@@ -173,7 +173,7 @@ async def recognize(
 
     from ..core.config import get_settings
 
-    demo_mode = get_settings().liwan_demo_mode
+    demo_mode = get_settings().attendyo_demo_mode
 
     # Load context (camera/door) and branding off-loop.
     def _load_context() -> tuple[Optional[dict], Optional[dict], Any]:

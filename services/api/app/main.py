@@ -1,4 +1,4 @@
-"""LIWAN API — application factory and lifecycle.
+"""ATTENDYO API — application factory and lifecycle.
 
 Wires up the FastAPI app: CORS for the Console (:3000) and Gate (:3001), all
 routers from the contract, a ``/media`` static mount, and startup work:
@@ -8,7 +8,7 @@ routers from the contract, a ``/media`` static mount, and startup work:
    script did not run), then every ``db/migrations/*.sql`` in filename order —
    all migration files are idempotent, so this is safe on every boot.
 3. Ensure the seeded admin operator exists.
-4. Seed the demo dataset when ``LIWAN_DEMO_MODE`` is on and the DB is empty.
+4. Seed the demo dataset when ``ATTENDYO_DEMO_MODE`` is on and the DB is empty.
 
 Everything is on-prem and offline: no telemetry, no outbound cloud calls.
 """
@@ -50,10 +50,10 @@ from .routers import (
 from .seed import ensure_admin_user, seed_demo_if_enabled
 
 logging.basicConfig(
-    level=os.environ.get("LIWAN_LOG_LEVEL", "INFO"),
+    level=os.environ.get("ATTENDYO_LOG_LEVEL", "INFO"),
     format="%(asctime)s %(levelname)s %(name)s :: %(message)s",
 )
-logger = logging.getLogger("liwan.main")
+logger = logging.getLogger("attendyo.main")
 
 
 def _run_sql_file(path: Path, label: str) -> None:
@@ -118,7 +118,7 @@ def _startup_sync() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Run startup seeding then tear the pool down on shutdown."""
-    logger.info("LIWAN API %s starting up", __version__)
+    logger.info("ATTENDYO API %s starting up", __version__)
     try:
         await run_in_threadpool(_startup_sync)
     except Exception as exc:  # pragma: no cover
@@ -126,7 +126,7 @@ async def lifespan(app: FastAPI):
         # the orchestrator restarts dependencies. The pool retries on demand.
         logger.warning("Startup tasks deferred: %s", exc)
     yield
-    logger.info("LIWAN API shutting down")
+    logger.info("ATTENDYO API shutting down")
     await run_in_threadpool(db.close_pool)
 
 
@@ -134,9 +134,9 @@ def create_app() -> FastAPI:
     """Construct and configure the FastAPI application."""
     settings = get_settings()
     app = FastAPI(
-        title="LIWAN API",
+        title="ATTENDYO API",
         version=__version__,
-        description="On-prem face attendance & access control. Implements liwan/CONTRACT.md.",
+        description="On-prem face attendance & access control. Implements attendyo/CONTRACT.md.",
         lifespan=lifespan,
     )
 
@@ -178,7 +178,7 @@ def create_app() -> FastAPI:
     async def root() -> JSONResponse:
         return JSONResponse(
             {
-                "service": "liwan-api",
+                "service": "attendyo-api",
                 "version": __version__,
                 "docs": "/docs",
                 "health": "/health",

@@ -1,6 +1,6 @@
 # Operations runbook
 
-Day-to-day tasks for the people who run Liwan — HR, reception, security, facility
+Day-to-day tasks for the people who run Attendyo — HR, reception, security, facility
 managers. Each task is given two ways: the **Console** (the web dashboard, the normal
 way) and the **API** (for scripts and integrations). API shapes are normative in
 [`../CONTRACT.md`](../CONTRACT.md).
@@ -12,7 +12,7 @@ way) and the **API** (for scripts and integrations). API shapes are normative in
 # Get an operator token (used by the curl examples below)
 TOKEN=$(curl -s $API/api/auth/login \
   -H 'Content-Type: application/json' \
-  -d '{"email":"admin@liwan.local","password":"<your-password>"}' \
+  -d '{"email":"admin@attendyo.local","password":"<your-password>"}' \
   | python -c 'import sys,json;print(json.load(sys.stdin)["access_token"])')
 ```
 
@@ -205,7 +205,7 @@ curl -s -X PUT $API/api/settings \
         "primary_color":"#5663F2","accent_color":"#E0A340","logo_url":null,"locale":"fr"}}'
 ```
 
-The UIs read these tokens from `GET /api/settings` and never hard-code "Liwan" — this is
+The UIs read these tokens from `GET /api/settings` and never hard-code "Attendyo" — this is
 what makes the same install shippable under a partner's brand.
 
 ---

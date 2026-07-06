@@ -1,4 +1,4 @@
-# LIWAN API — Python dependencies.
+# ATTENDYO API — Python dependencies.
 # On-prem / offline: only well-known PyPI packages, no cloud SDKs, no telemetry.
 fastapi==0.111.0
 uvicorn[standard]==0.30.1

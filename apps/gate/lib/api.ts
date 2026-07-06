@@ -1,8 +1,8 @@
 /**
- * Liwan API client for the Gate kiosk.
+ * Attendyo API client for the Gate kiosk.
  *
  * All calls are made browser-side against NEXT_PUBLIC_API_URL — the kiosk talks
- * to the on-prem Liwan API directly over the LAN. No cloud, no telemetry.
+ * to the on-prem Attendyo API directly over the LAN. No cloud, no telemetry.
  *
  * Device endpoints (POST /api/recognize) authenticate with the shared
  * `X-Device-Key` header (CONTRACT.md → Base URL & auth).

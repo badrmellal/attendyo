@@ -20,7 +20,7 @@ from starlette.concurrency import run_in_threadpool
 from ..core import audit, db, security
 from ..models.schemas import AccessGroup, AccessGroupCreate, AccessGroupUpdate
 
-logger = logging.getLogger("liwan.access_groups.router")
+logger = logging.getLogger("attendyo.access_groups.router")
 
 router = APIRouter(prefix="/api/access-groups", tags=["access-groups"])
 

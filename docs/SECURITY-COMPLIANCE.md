@@ -1,17 +1,17 @@
 # Security & compliance
 
-Liwan processes **biometric data** (face images and the templates derived from them).
+Attendyo processes **biometric data** (face images and the templates derived from them).
 In Morocco that makes it **sensitive personal data** under **Law 09-08** and brings it
 under the supervision of the **CNDP** (Commission Nationale de contrôle de la protection
 des Données à caractère Personnel). This document explains what the *architecture* gives
 you, and — just as importantly — **what the buyer still has to do**. None of it is legal
 advice; engage qualified counsel and your DPO.
 
-> **Plain statement of fact, and of limits.** Liwan is built so that biometric data stays
+> **Plain statement of fact, and of limits.** Attendyo is built so that biometric data stays
 > on your premises. That is an architectural fact. It does **not**, by itself, make a
 > deployment "compliant." Compliance is a process — authorisation, notice, consent or
 > another legal basis, retention, security, and accountability — that the controller (the
-> buyer) owns. Liwan is a tool that makes that process much easier; it is not a
+> buyer) owns. Attendyo is a tool that makes that process much easier; it is not a
 > certificate.
 
 ---
@@ -29,7 +29,7 @@ advice; engage qualified counsel and your DPO.
   data is tightly controlled; an on-prem system that never sends data abroad removes that
   whole problem class. (You must still keep it that way operationally — see §6 on backups.)
 
-This is the strongest part of the Liwan compliance story: the data physically cannot leak
+This is the strongest part of the Attendyo compliance story: the data physically cannot leak
 to a vendor cloud because there is no vendor cloud in the loop.
 
 ---
@@ -53,7 +53,7 @@ processing. As the **data controller**, the buyer is responsible for, at minimum
    a **non-biometric alternative** where required (e.g. a manual register), and document
    that choice.
 4. **Data-subject rights.** Have a process to honour access/rectification/erasure requests
-   — Liwan supports this operationally (delete a member removes their engine subject;
+   — Attendyo supports this operationally (delete a member removes their engine subject;
    see §5).
 5. **Security & retention measures** proportionate to the sensitivity (this document and
    the controls below help, but the buyer must adopt and enforce them).
@@ -61,7 +61,7 @@ processing. As the **data controller**, the buyer is responsible for, at minimum
 
 > The exact forms, thresholds, and whether an authorisation vs. simplified regime applies
 > can change. **Confirm the current CNDP requirements and file the correct paperwork with
-> legal counsel before deployment.** Liwan does not file anything on your behalf and makes
+> legal counsel before deployment.** Attendyo does not file anything on your behalf and makes
 > no representation that any specific deployment is authorised.
 
 ---
@@ -69,7 +69,7 @@ processing. As the **data controller**, the buyer is responsible for, at minimum
 ## 3. GDPR alignment (for multinationals / EU ties)
 
 Many Moroccan banks, subsidiaries, and government partners also touch the EU **GDPR**.
-Liwan's design aligns with several GDPR principles, though alignment is not certification:
+Attendyo's design aligns with several GDPR principles, though alignment is not certification:
 
 - **Data minimisation (Art. 5).** One photo per person; only the fields you choose to
   enter. No surplus collection.
@@ -78,7 +78,7 @@ Liwan's design aligns with several GDPR principles, though alignment is not cert
 - **Privacy by design & by default (Art. 25).** On-prem, fail-closed, LAN-only, no
   external sharing.
 - **Special-category data (Art. 9).** Biometrics for unique identification are special
-  category; the buyer needs an Art. 9 condition (and usually a **DPIA**, Art. 35) — Liwan
+  category; the buyer needs an Art. 9 condition (and usually a **DPIA**, Art. 35) — Attendyo
   gives you the technical posture, you provide the legal basis and the DPIA.
 - **Security of processing (Art. 32).** See the controls in §4.
 
@@ -86,7 +86,7 @@ Liwan's design aligns with several GDPR principles, though alignment is not cert
 
 ## 4. Security controls
 
-What Liwan provides, and how to operate it safely.
+What Attendyo provides, and how to operate it safely.
 
 **In the product**
 
@@ -95,8 +95,8 @@ What Liwan provides, and how to operate it safely.
 - **Separation of duties.** Console operators are `users` with roles
   (`admin | operator | viewer`), entirely separate from the enrolled `members`.
 - **Two distinct credentials.** Operators authenticate with a JWT bearer
-  (`LIWAN_JWT_SECRET`); devices/kiosks authenticate the recognition endpoint with a
-  shared `X-Device-Key` (`LIWAN_DEVICE_KEY`). They are not interchangeable.
+  (`ATTENDYO_JWT_SECRET`); devices/kiosks authenticate the recognition endpoint with a
+  shared `X-Device-Key` (`ATTENDYO_DEVICE_KEY`). They are not interchangeable.
 - **Per-door, per-time authorisation.** Access groups bind members to specific doors and
   schedules; off-door or off-schedule access is denied and logged.
 - **Full audit trail.** Every decision — granted *and* denied — is written to
@@ -112,8 +112,8 @@ What Liwan provides, and how to operate it safely.
 
 **What the buyer must configure**
 
-- **Change every default secret** on first run: `postgres_password`, `LIWAN_JWT_SECRET`,
-  `LIWAN_ADMIN_PASSWORD`, `LIWAN_DEVICE_KEY`, and the `admin@liwan.local` password. The
+- **Change every default secret** on first run: `postgres_password`, `ATTENDYO_JWT_SECRET`,
+  `ATTENDYO_ADMIN_PASSWORD`, `ATTENDYO_DEVICE_KEY`, and the `admin@attendyo.local` password. The
   defaults in `.env.example` are placeholders, not credentials.
 - **Lock down the network.** Publish only Console/Gate/API on the LAN; keep Postgres
   (5432) and the engine console (8000) internal. Use a host firewall and, ideally, a
@@ -139,20 +139,20 @@ A common, fair question from security and privacy reviewers.
   as "anonymous." A template is still **biometric personal data** — it can identify a
   person — and must be protected as such under Law 09-08 / GDPR. Do not treat templates as
   non-personal just because they aren't pictures.
-- **Liwan also stores the enrolment image and event snapshots** by default
+- **Attendyo also stores the enrolment image and event snapshots** by default
   (`save_images_to_db=true`, plus the media volume) so operators can verify matches. Those
   **are** images and are unambiguously personal data. If your policy forbids retaining
   source images, you can reduce snapshot/image retention (§6) — at the cost of
   visual auditability.
 - **Erasure works at the source:** deleting a member (`DELETE /api/members/{id}`) removes
-  the engine subject (its template) as well as the Liwan record, satisfying a
+  the engine subject (its template) as well as the Attendyo record, satisfying a
   right-to-erasure request for that person's biometric data.
 
 ---
 
 ## 6. Retention & access control
 
-Retention is a policy you set and Liwan enforces operationally.
+Retention is a policy you set and Attendyo enforces operationally.
 
 - **Decide retention windows up front**, per data class, and document them:
   - **Enrolment images / templates** — for the lifetime of the person's relationship with
@@ -173,15 +173,15 @@ Retention is a policy you set and Liwan enforces operationally.
 
 ---
 
-## 7. What Liwan does NOT claim
+## 7. What Attendyo does NOT claim
 
 To keep this honest and sellable to banks and government without overpromising:
 
-- **No certifications are claimed.** Liwan is not stated to be ISO 27001, SOC 2, CNDP-
+- **No certifications are claimed.** Attendyo is not stated to be ISO 27001, SOC 2, CNDP-
   "approved," or GDPR-"certified." Those are organisational/process certifications that a
   product alone cannot confer. Where a tender requires them, they attach to the
   *deploying organisation* and its processes, not to this software by default.
-- **Liwan is not a legal basis.** Installing it does not authorise biometric processing;
+- **Attendyo is not a legal basis.** Installing it does not authorise biometric processing;
   the CNDP authorisation and the lawful basis are the controller's to obtain.
 - **Accuracy is probabilistic.** Face recognition has false-accept/false-reject rates that
   vary with lighting, camera, and population. Tune thresholds per camera, and keep a

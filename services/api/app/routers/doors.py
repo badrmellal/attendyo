@@ -22,7 +22,7 @@ from ..doors import factory as door_factory
 from ..doors.base import DoorContext
 from ..models.schemas import Door, DoorCreate, DoorUpdate
 
-logger = logging.getLogger("liwan.doors.router")
+logger = logging.getLogger("attendyo.doors.router")
 
 router = APIRouter(prefix="/api/doors", tags=["doors"])
 

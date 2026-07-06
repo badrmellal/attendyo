@@ -1,5 +1,5 @@
 /**
- * Branding + localization for Liwan Gate.
+ * Branding + localization for Attendyo Gate.
  *
  * Defaults come from brand/BRAND.md and db/schema.sql's seeded `branding` row.
  * At runtime the real values are read from GET /api/settings → branding, so the
@@ -10,8 +10,8 @@ import type { Branding, Direction, Locale } from "./types";
 
 /** Fallback branding — matches the seeded settings in db/schema.sql. */
 export const DEFAULT_BRANDING: Branding = {
-  product_name: "Liwan",
-  tagline: "The threshold that knows your people.",
+  product_name: "Attendyo",
+  tagline: "The face is the key.",
   primary_color: "#5663F2",
   accent_color: "#E0A340",
   logo_url: null,

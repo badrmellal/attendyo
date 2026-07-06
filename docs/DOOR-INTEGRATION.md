@@ -1,6 +1,6 @@
 # Door integration
 
-How Liwan turns a `granted` decision into an open door — and how to wire that to real
+How Attendyo turns a `granted` decision into an open door — and how to wire that to real
 hardware. Each door in the database carries a **driver** and a **`driver_config`** JSON
 blob; the API fires the matching driver when a recognition is `granted`, and re-locks
 after `relock_seconds`.
@@ -64,13 +64,13 @@ Content-Type: application/json
 { "state": "open", "ms": 5000 }
 ```
 
-The relay is responsible for the physical pulse and (ideally) its own relock. Liwan also
+The relay is responsible for the physical pulse and (ideally) its own relock. Attendyo also
 relocks logically after `relock_seconds`; set the relay's own pulse to match.
 
 **Timeouts & failure:** the API treats the webhook as best-effort with a short timeout.
 If the relay errors or times out, the decision is still recorded as `granted` with a
 `reason` noting the driver failure, so operators see it in the live monitor. The door
-simply did not actuate — Liwan never "fails open."
+simply did not actuate — Attendyo never "fails open."
 
 ---
 
@@ -187,7 +187,7 @@ void loop() { server.handleClient(); }
 
 Two options.
 
-**A) `pi_gpio` driver** — the API talks to a small Liwan GPIO agent on the Pi:
+**A) `pi_gpio` driver** — the API talks to a small Attendyo GPIO agent on the Pi:
 
 ```json
 {
@@ -214,7 +214,7 @@ import time
 # active_high=False matches a common active-LOW relay board
 relay = OutputDevice(17, active_high=False, initial_value=False)
 app = Flask(__name__)
-SECRET = "shared-with-liwan"
+SECRET = "shared-with-attendyo"
 
 @app.post("/open")
 def open_door():
@@ -233,7 +233,7 @@ def open_door():
 {
   "url": "http://192.168.1.53:8090/open",
   "method": "POST",
-  "headers": { "X-Door-Secret": "shared-with-liwan" },
+  "headers": { "X-Door-Secret": "shared-with-attendyo" },
   "on_grant": { "ms": 5000 }
 }
 ```
@@ -247,7 +247,7 @@ def open_door():
 > meets local fire codes. The notes below are integration guidance, not an electrical
 > standard.
 
-- **Use the relay as a dry contact.** Liwan/relays switch a low-voltage *control* signal;
+- **Use the relay as a dry contact.** Attendyo/relays switch a low-voltage *control* signal;
   the strike's own power supply drives the lock. Do not source lock current from the
   relay logic.
 - **Fail-safe vs fail-secure.** A **fail-secure** strike stays locked with no power (opens
@@ -262,9 +262,9 @@ def open_door():
   snubber (AC) across the lock coil to protect the relay contacts.
 - **Free egress.** People must always be able to leave. Don't gate exit on recognition for
   a door that is also a fire exit — use a request-to-exit button / hardware egress, and
-  set the door `direction` to `in` so Liwan controls entry only.
+  set the door `direction` to `in` so Attendyo controls entry only.
 - **Two doors, one server.** Each door is its own row with its own driver and relay; one
-  Liwan box drives many doors over the LAN. There is no per-door licence.
+  Attendyo box drives many doors over the LAN. There is no per-door licence.
 
 ---
 

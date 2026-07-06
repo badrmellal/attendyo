@@ -1,4 +1,4 @@
-# LIWAN — System Contract (source of truth)
+# ATTENDYO — System Contract (source of truth)
 
 Every module builds against this. The backend implements it; the Console and Gate
 consume it; the Bridge calls the recognition endpoint. Do not diverge silently — if
@@ -8,23 +8,23 @@ a module needs a change, update this file first.
 
 ```
  Camera (RTSP/USB) ─► Bridge (Python) ─┐
-                                       ├─► POST /api/recognize ─► Liwan API (FastAPI)
+                                       ├─► POST /api/recognize ─► Attendyo API (FastAPI)
  Gate kiosk (browser webcam) ──────────┘                              │
                                                                       ├─► Vision engine  (recognize / enroll)
-                                                                      ├─► Postgres (schema `liwan`)
+                                                                      ├─► Postgres (schema `attendyo`)
                                                                       └─► Door driver (webhook | pi_gpio | simulation)
 
- Console (Next.js) ◄──REST + SSE──► Liwan API
- Gate    (Next.js) ◄──REST + SSE──► Liwan API
+ Console (Next.js) ◄──REST + SSE──► Attendyo API
+ Gate    (Next.js) ◄──REST + SSE──► Attendyo API
 ```
 
 ## Base URL & auth
 
-- API base: `http://localhost:8088` (compose service `liwan-api`).
+- API base: `http://localhost:8088` (compose service `attendyo-api`).
 - Auth: `POST /api/auth/login` → `{ "access_token": "...", "token_type": "bearer" }`.
   Send `Authorization: Bearer <token>` on every `/api/*` call except `/health`,
   `/api/auth/login`, and `/api/recognize` (device calls use `X-Device-Key`).
-- Default seeded operator: `admin@liwan.local` / `liwan-admin` (change on first run).
+- Default seeded operator: `admin@attendyo.local` / `attendyo-admin` (change on first run).
 
 ## Core types
 
@@ -177,7 +177,7 @@ type Alert = { id:number; ts:string; kind:"unknown_face"|"not_authorized"|"off_s
     → `not_authorized`, reason `"expired"` (or `"not_yet_valid"`).
 
 ### Engine naming (white-label)
-The recognition core is referred to as the **Liwan Vision Engine** in every
+The recognition core is referred to as the **Attendyo Vision Engine** in every
 customer-facing surface (docs, sales, UI, compose service names, env vars).
 Env vars: `ENGINE_URL` / `ENGINE_API_KEY` (the API also accepts the legacy
 legacy engine variable names as fallbacks). Third-party attribution
@@ -208,7 +208,7 @@ lives ONLY in `NOTICE` / the licence section, as Apache-2.0 requires.
 
 `GET /api/settings → branding`: `product_name`, `tagline`, `primary_color`,
 `accent_color`, `logo_url`, `locale ("fr"|"en"|"ar")`. UIs must read these, never
-hard-code the brand — that is what makes Liwan white-label.
+hard-code the brand — that is what makes Attendyo white-label.
 
 ## Reconciliation notes (as-built)
 

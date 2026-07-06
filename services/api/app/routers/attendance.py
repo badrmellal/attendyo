@@ -27,7 +27,7 @@ from starlette.concurrency import run_in_threadpool
 from ..core import db, security
 from ..models.schemas import AttendanceDay
 
-logger = logging.getLogger("liwan.attendance.router")
+logger = logging.getLogger("attendyo.attendance.router")
 
 router = APIRouter(prefix="/api/attendance", tags=["attendance"])
 

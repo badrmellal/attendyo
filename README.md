@@ -2,47 +2,41 @@
   Default brand tokens below come from brand/BRAND.md. They are the *factory*
   identity. Every deployment can rebrand from GET /api/settings → branding
   (product_name, tagline, primary_color, accent_color, logo_url, locale).
-  Do not treat the name "Liwan" as fixed in the running product — it is white-label.
+  Do not treat the name "Attendyo" as fixed in the running product — it is white-label.
 -->
 
 <div align="center">
 
-# لِيوان · LIWAN
+# ATTENDYO
 
-### The threshold that knows your people.
+### The face is the key.
 
 **On-premise face attendance & access control.**
 Sold once. Owned forever. Runs on your own LAN — no cloud, no subscription, no RFID cards to lose.
 
-`Liwan Vision Engine` · `CPU-only` · `Unlimited enrolled faces` · `Morocco Law 09-08 / CNDP-friendly by design`
+`Attendyo Vision Engine` · `CPU-only` · `Unlimited enrolled faces` · `Morocco Law 09-08 / CNDP-friendly by design`
 
 <br>
 
-<img src="docs/screenshots/gate-idle.png" alt="Liwan Gate | the live camera framed inside a Moroccan arch, 'Regardez la caméra'" width="760">
+<img src="docs/screenshots/gate-idle.png" alt="Attendyo Gate — the live camera framed inside the Check Gate mark, 'Regardez la caméra'" width="760">
 
-<sub>The Gate kiosk at rest — a face appears inside the arched threshold; the door opens when Liwan knows them.</sub>
+<sub>The Gate kiosk at rest — a face appears inside the frame; the door opens when Attendyo knows them.</sub>
 
 </div>
 
 ---
 
-## What لِيوان means
+## What Attendyo does
 
-A **līwān** (لِيوان / إيوان) is the great vaulted hall in Moroccan and Islamic
-architecture — open on one side through a monumental **arch**, fronting the
-courtyard. It is the *threshold* where outside meets inside: the place you pass
-through to enter.
+It recognises the people who belong at your door, opens the way for them, and writes
+down — for every person, every day — when they arrived and when they left. No badges,
+no PIN pads, no queue at the turnstile, no RFID card to lose, lend, or clone. A single
+enrolled photo is the only credential; the face itself is the key.
 
-The product stands in exactly that place. At the threshold of your building it
-recognises the people who belong, opens the way for them, and writes down — for
-every person, every day — when they arrived and when they left. No badges, no PIN
-pads, no queue at the turnstile. **The arch is the doorway; Liwan is the doorway
-that remembers.** A face is the key, and the key is never lost, lent, or cloned.
-
-Liwan is **white-label by design.** The name, tagline, colours, logo, and language
+Attendyo is **white-label by design.** The name, tagline, colours, logo, and language
 shown to operators and visitors are read at runtime from `GET /api/settings → branding`.
 A systems integrator can ship it to a bank as one brand and to a residence as another
-without touching the code. "Liwan" is only the factory default.
+without touching the code. "Attendyo" is only the factory default.
 
 ## Positioning
 
@@ -59,13 +53,13 @@ preset (`branding.terminology`): the Console speaks *Étudiants & Personnel* and
 give exchange students and *vacataires* access that expires by itself. Presets ship
 for `workforce`, `campus`, and `residence` — relabel, don't re-code.
 
-## Why Liwan (the differentiators)
+## Why Attendyo (the differentiators)
 
 - **Software-first, on commodity CPU.** No proprietary terminal to buy per door. Runs
   on a single Intel/AMD or ARM box you already own. The recognition core ships in a
   CPU (MobileNet) build — no GPU required.
 - **Unlimited enrolled faces.** Hardware terminals cap out (e.g. ZKTeco uFace302 ≈ 3,000
-  faces per device). Liwan is bounded by your server's disk and RAM, not by firmware.
+  faces per device). Attendyo is bounded by your server's disk and RAM, not by firmware.
 - **One-time perpetual on-prem licence.** Pay once, own it. No per-seat, per-door, or
   per-month SaaS bill, and no "renew or it stops working" lock-in.
 - **Data never leaves the LAN.** No cloud calls, no telemetry, no third-party SaaS in
@@ -144,9 +138,9 @@ flowchart LR
     end
 
     subgraph Server["Single CPU server (Docker)"]
-        API["Liwan API<br/>(FastAPI · :8088)"]
-        CF["Liwan Vision Engine<br/>(recognise / enroll · :8000 console)"]
-        DB[("PostgreSQL<br/>schema 'liwan'")]
+        API["Attendyo API<br/>(FastAPI · :8088)"]
+        CF["Attendyo Vision Engine<br/>(recognise / enroll · :8000 console)"]
+        DB[("PostgreSQL<br/>schema 'attendyo'")]
     end
 
     DOOR["Door driver<br/>webhook · pi_gpio · simulation"]
@@ -183,7 +177,7 @@ door driver when the decision is `granted`. The full decision ladder is in
 # 1) Configure. Edit secrets before anything goes to a real network.
 cp .env.example .env
 #    In .env, change at minimum:
-#      postgres_password, LIWAN_JWT_SECRET, LIWAN_ADMIN_PASSWORD, LIWAN_DEVICE_KEY
+#      postgres_password, ATTENDYO_JWT_SECRET, ATTENDYO_ADMIN_PASSWORD, ATTENDYO_DEVICE_KEY
 
 # 2) Bring up the full stack (engine + API + Console + Gate).
 docker compose up -d
@@ -193,7 +187,7 @@ docker compose up -d
 #    prints the API key, and writes it into .env as ENGINE_API_KEY:
 python scripts/provision_engine.py \
   --email admin@example.com --password 'a-strong-password' --write-env
-docker compose up -d liwan-api    # restart the API so it picks up the key
+docker compose up -d attendyo-api    # restart the API so it picks up the key
 #    Fallback (if the script cannot complete): open the engine console at
 #    http://localhost:8000, create an application → add a "Recognition"
 #    service → copy its API key → paste it into .env as ENGINE_API_KEY.
@@ -206,13 +200,13 @@ open http://localhost:3000        # Console  — admin dashboard (login below)
 open http://localhost:3001        # Gate     — fullscreen door kiosk for a tablet
 ```
 
-**First login:** `admin@liwan.local` / `liwan-admin` (from `.env` — **change it on first
+**First login:** `admin@attendyo.local` / `attendyo-admin` (from `.env` — **change it on first
 run**, under Console → Settings).
 
 To run a fixed RTSP camera through the Bridge instead of the Gate webcam:
 
 ```bash
-docker compose --profile cameras up -d liwan-bridge
+docker compose --profile cameras up -d attendyo-bridge
 ```
 
 ## Ports
@@ -220,10 +214,10 @@ docker compose --profile cameras up -d liwan-bridge
 | Port  | Service              | Audience              | Purpose                                                        |
 |-------|----------------------|-----------------------|----------------------------------------------------------------|
 | 8000  | Engine console       | installer (one time)  | Create the Recognition service + API key; engine config        |
-| 8088  | Liwan API (FastAPI)  | apps, devices, Bridge | The contract — REST + SSE; `/api/recognize` is the hot path    |
-| 3000  | Liwan Console        | operators / admins    | Login, dashboard, enrolment, attendance, CSV, live monitor     |
-| 3001  | Liwan Gate           | visitors at the door  | Fullscreen kiosk: webcam, greet-by-name, door-open animation   |
-| 5432  | PostgreSQL           | internal only         | Shared DB; the engine owns `public`, Liwan owns schema `liwan`  |
+| 8088  | Attendyo API (FastAPI)  | apps, devices, Bridge | The contract — REST + SSE; `/api/recognize` is the hot path    |
+| 3000  | Attendyo Console        | operators / admins    | Login, dashboard, enrolment, attendance, CSV, live monitor     |
+| 3001  | Attendyo Gate           | visitors at the door  | Fullscreen kiosk: webcam, greet-by-name, door-open animation   |
+| 5432  | PostgreSQL           | internal only         | Shared DB; the engine owns `public`, Attendyo owns schema `attendyo`  |
 
 > Only expose what you must. In production, publish 3000 / 3001 / 8088 on the LAN and
 > keep 5432 and 8000 internal. See [`docs/INSTALL.md`](docs/INSTALL.md) for firewalling.
@@ -231,7 +225,7 @@ docker compose --profile cameras up -d liwan-bridge
 ## Repository map
 
 ```
-liwan/
+attendyo/
 ├── README.md                 # this file
 ├── LICENSE                   # commercial / perpetual EULA TEMPLATE (review with counsel)
 ├── NOTICE                    # third-party open-source attribution (Apache-2.0)
@@ -240,12 +234,12 @@ liwan/
 ├── .env.example              # runtime configuration; copy to .env
 │
 ├── db/
-│   └── schema.sql            # Postgres schema (lives in schema "liwan")
+│   └── schema.sql            # Postgres schema (lives in schema "attendyo")
 ├── brand/
 │   └── BRAND.md              # design system, colour tokens, voice (default branding)
 │
 ├── services/
-│   ├── api/                  # Liwan API — FastAPI, implements CONTRACT.md
+│   ├── api/                  # Attendyo API — FastAPI, implements CONTRACT.md
 │   └── bridge/               # camera → recognise → door worker (optional, RTSP)
 ├── apps/
 │   ├── console/              # admin dashboard (Next.js, :3000)
@@ -263,17 +257,17 @@ liwan/
 └── sales/
     ├── ONE-PAGER.md          # FR + EN one-pager
     ├── PRICING.md            # one-time licence tiers (suggested), vs ZKTeco math
-    ├── COMPARISON.md         # Liwan vs ZKTeco vs Hikvision vs cloud SaaS
+    ├── COMPARISON.md         # Attendyo vs ZKTeco vs Hikvision vs cloud SaaS
     ├── VERTICALS.md          # residential / bank / municipality / industrial / corporate
     └── PITCH-DECK.md         # 10–12 slide outline with speaker notes
 ```
 
 ## Licence & attribution
 
-- **Liwan application code** (API, Console, Gate, Bridge, scripts, docs) is offered under
+- **Attendyo application code** (API, Console, Gate, Bridge, scripts, docs) is offered under
   a **one-time perpetual commercial licence**. The bundled [`LICENSE`](LICENSE) is a
   **template** EULA — have it reviewed by qualified legal counsel before use in a sale.
-- Liwan's vision engine incorporates open-source components; full attribution in
+- Attendyo's vision engine incorporates open-source components; full attribution in
   [`NOTICE`](NOTICE).
 - Trademarks named for comparison (ZKTeco, Hikvision, Matrix COSEC) belong to their
   respective owners and are used only for factual, descriptive comparison.
@@ -281,5 +275,5 @@ liwan/
 ---
 
 <div align="center">
-<sub>Liwan · لِيوان | sovereign by default. Your faces, your doors, your data, your LAN.</sub>
+<sub>Attendyo — sovereign by default. Your faces, your doors, your data, your LAN.</sub>
 </div>

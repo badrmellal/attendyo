@@ -25,7 +25,7 @@ from ..core import db, media, security
 from ..events_bus import bus
 from ..models.schemas import AccessEvent
 
-logger = logging.getLogger("liwan.events")
+logger = logging.getLogger("attendyo.events")
 
 router = APIRouter(prefix="/api/events", tags=["events"])
 

@@ -22,7 +22,7 @@ from typing import Any
 
 from .base import DoorActionResult, DoorContext, DoorDriver
 
-logger = logging.getLogger("liwan.doors.pi_gpio")
+logger = logging.getLogger("attendyo.doors.pi_gpio")
 
 
 class PiGpioDriver(DoorDriver):

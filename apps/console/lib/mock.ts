@@ -438,8 +438,8 @@ export function mockTodayStats(): TodayStats {
 // Settings / branding — defaults straight from brand/BRAND.md & schema seed.
 // --------------------------------------------------------------------------
 export const MOCK_BRANDING: Branding = {
-  product_name: "Liwan",
-  tagline: "The threshold that knows your people.",
+  product_name: "Attendyo",
+  tagline: "The face is the key.",
   primary_color: "#5663F2",
   accent_color: "#E0A340",
   logo_url: null,
@@ -638,9 +638,9 @@ export function deleteMockCamera(id: string): void {
 
 // --------------------------------------------------------------------------
 // Operator users — the Console team (admin / operator / viewer).
-// The signed-in demo operator is admin@liwan.local (see api.ts `me()`).
+// The signed-in demo operator is admin@attendyo.local (see api.ts `me()`).
 // --------------------------------------------------------------------------
-export const MOCK_SELF_EMAIL = "admin@liwan.local";
+export const MOCK_SELF_EMAIL = "admin@attendyo.local";
 
 const SEED_USERS: OperatorUser[] = [
   {

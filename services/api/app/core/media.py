@@ -15,7 +15,7 @@ from pathlib import Path
 
 from .config import get_settings
 
-logger = logging.getLogger("liwan.media")
+logger = logging.getLogger("attendyo.media")
 
 # Subdirectories under MEDIA_ROOT.
 ENROLL_DIR = "enroll"

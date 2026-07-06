@@ -15,7 +15,7 @@ from .pi_gpio import PiGpioDriver
 from .simulation import SimulationDriver
 from .webhook import WebhookDriver
 
-logger = logging.getLogger("liwan.doors.factory")
+logger = logging.getLogger("attendyo.doors.factory")
 
 _REGISTRY: dict[str, type[DoorDriver]] = {
     "simulation": SimulationDriver,
@@ -28,7 +28,7 @@ def build(door: Mapping[str, Any]) -> DoorDriver:
     """Construct a driver instance for the given door row.
 
     ``door`` must contain ``id``, ``name``, ``driver``, ``driver_config`` and
-    ``relock_seconds`` (exactly the columns of ``liwan.doors``).
+    ``relock_seconds`` (exactly the columns of ``attendyo.doors``).
     """
     driver_name = str(door.get("driver") or "simulation")
     cls = _REGISTRY.get(driver_name)

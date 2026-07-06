@@ -1,7 +1,7 @@
-"""LIWAN API — on-prem face attendance & access-control backend.
+"""ATTENDYO API — on-prem face attendance & access-control backend.
 
-White-label FastAPI service wrapping the Liwan Vision Engine (the bundled
-recognition core). Implements the contract in ``liwan/CONTRACT.md`` exactly,
+White-label FastAPI service wrapping the Attendyo Vision Engine (the bundled
+recognition core). Implements the contract in ``attendyo/CONTRACT.md`` exactly,
 including the v2 endpoints (reports, presence, alerts, audit, users, import).
 """
 

@@ -22,7 +22,7 @@ from starlette.concurrency import run_in_threadpool
 from ..core import audit, db, security
 from ..models.schemas import AckAllResult, Alert, AlertCount, AlertKind
 
-logger = logging.getLogger("liwan.alerts")
+logger = logging.getLogger("attendyo.alerts")
 
 router = APIRouter(prefix="/api/alerts", tags=["alerts"])
 

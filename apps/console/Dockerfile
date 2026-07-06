@@ -1,5 +1,5 @@
 # ===========================================================================
-# Liwan Console — multi-stage build producing a standalone Next.js server.
+# Attendyo Console — multi-stage build producing a standalone Next.js server.
 # Runs fully on-prem; no network access required at runtime.
 # ===========================================================================
 

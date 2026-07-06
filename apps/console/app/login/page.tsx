@@ -3,7 +3,7 @@
 /**
  * Login — an elegant split screen. Left: branded narrative panel (the watchful
  * gate, the on-prem promise). Right: the sign-in form. Calls POST /api/auth/login
- * via the typed client; in mock mode it accepts admin@liwan.local / liwan-admin.
+ * via the typed client; in mock mode it accepts admin@attendyo.local / attendyo-admin.
  */
 
 import { useState } from "react";
@@ -17,8 +17,8 @@ import { login, setToken, isMockForced } from "@/lib/api";
 export default function LoginPage() {
   const router = useRouter();
   const { branding, t } = useBranding();
-  const [email, setEmail] = useState(isMockForced() ? "admin@liwan.local" : "");
-  const [password, setPassword] = useState(isMockForced() ? "liwan-admin" : "");
+  const [email, setEmail] = useState(isMockForced() ? "admin@attendyo.local" : "");
+  const [password, setPassword] = useState(isMockForced() ? "attendyo-admin" : "");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -110,7 +110,7 @@ export default function LoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="field w-full py-2.5 pl-10 pr-3 text-sm"
-                  placeholder="admin@liwan.local"
+                  placeholder="admin@attendyo.local"
                 />
               </div>
             </label>
@@ -159,8 +159,8 @@ export default function LoginPage() {
           {isMockForced() && (
             <p className="mt-6 rounded-lg border border-accent/20 bg-accent/[0.06] px-3 py-2.5 text-center text-xs text-text-muted">
               Mode démo — connectez-vous avec{" "}
-              <span className="font-medium text-text">admin@liwan.local</span> /{" "}
-              <span className="font-medium text-text">liwan-admin</span>
+              <span className="font-medium text-text">admin@attendyo.local</span> /{" "}
+              <span className="font-medium text-text">attendyo-admin</span>
             </p>
           )}
         </div>

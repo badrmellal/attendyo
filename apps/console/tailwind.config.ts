@@ -1,7 +1,7 @@
 import type { Config } from "tailwindcss";
 
 /**
- * Tailwind config for the Liwan Console.
+ * Tailwind config for the Attendyo Console.
  *
  * Colors are exposed as CSS custom properties (see app/globals.css) so the UI
  * can be recolored at runtime from `GET /api/settings → branding` without a

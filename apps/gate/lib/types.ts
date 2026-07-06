@@ -1,5 +1,5 @@
 /**
- * Shared types for Liwan Gate, mirrored from the system CONTRACT.md.
+ * Shared types for Attendyo Gate, mirrored from the system CONTRACT.md.
  * Keep these in lockstep with the contract — do not diverge silently.
  */
 

@@ -17,7 +17,7 @@ from starlette.concurrency import run_in_threadpool
 from ..core import db, security
 from ..models.schemas import AuditEntry
 
-logger = logging.getLogger("liwan.audit.router")
+logger = logging.getLogger("attendyo.audit.router")
 
 router = APIRouter(prefix="/api/audit", tags=["audit"])
 

@@ -11,8 +11,8 @@ import type { Branding, Locale } from "./types";
 import { hexToRgbTriplet } from "./utils";
 
 export const DEFAULT_BRANDING: Branding = {
-  product_name: "Liwan",
-  tagline: "The threshold that knows your people.",
+  product_name: "Attendyo",
+  tagline: "The face is the key.",
   primary_color: "#5663F2",
   accent_color: "#E0A340",
   logo_url: null,

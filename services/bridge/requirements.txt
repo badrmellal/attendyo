@@ -1,4 +1,4 @@
-# LIWAN Bridge — headless camera worker dependencies.
+# ATTENDYO Bridge — headless camera worker dependencies.
 # On-prem, CPU-only, no cloud SDKs. Pinned to conservative, widely-available
 # versions so an offline `pip download` mirror can serve them on a bank LAN.
 
@@ -10,7 +10,7 @@ opencv-python-headless==4.10.0.84
 # transitive dep of OpenCV, but pin it explicitly so nothing is implicit.
 numpy==1.26.4
 
-# HTTP client for the Liwan API (login, /api/cameras, /api/recognize).
+# HTTP client for the Attendyo API (login, /api/cameras, /api/recognize).
 requests==2.32.3
 
 # Load configuration from a .env file when not injected by the container env.

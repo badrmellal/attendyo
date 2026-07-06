@@ -17,7 +17,7 @@ import asyncio
 import logging
 from typing import Any
 
-logger = logging.getLogger("liwan.events")
+logger = logging.getLogger("attendyo.events")
 
 # Per-subscriber buffer. Recognition is bursty but low-volume; a small buffer is
 # plenty and protects memory if a browser tab stalls.

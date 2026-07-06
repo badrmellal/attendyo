@@ -1,6 +1,6 @@
-# Comparison — Liwan vs the alternatives
+# Comparison — Attendyo vs the alternatives
 
-How Liwan stacks up against the options a Moroccan buyer actually weighs: a **ZKTeco face
+How Attendyo stacks up against the options a Moroccan buyer actually weighs: a **ZKTeco face
 terminal** (the volume leader), a **Hikvision face terminal** (premium hardware), and a
 **cloud face-attendance SaaS**. Use this for tenders and objection handling.
 
@@ -12,7 +12,7 @@ terminal** (the volume leader), a **Hikvision face terminal** (premium hardware)
 
 ## 1. At-a-glance table
 
-| Dimension                         | **Liwan** | **ZKTeco uFace302** (terminal) | **Hikvision face terminal** | **Cloud face SaaS** |
+| Dimension                         | **Attendyo** | **ZKTeco uFace302** (terminal) | **Hikvision face terminal** | **Cloud face SaaS** |
 |-----------------------------------|-----------|--------------------------------|-----------------------------|---------------------|
 | Deployment                        | **On-prem software, your server** | Hardware terminal per door | Hardware terminal per door | Vendor cloud |
 | Cost model                        | **One-time perpetual licence** | Per-device purchase (~850–5,500 MAD) | Per-device purchase (premium) | **Recurring subscription** |
@@ -33,7 +33,7 @@ terminal** (the volume leader), a **Hikvision face terminal** (premium hardware)
 
 ---
 
-## 2. Where each alternative wins — and where Liwan answers
+## 2. Where each alternative wins — and where Attendyo answers
 
 **ZKTeco uFace302 (and similar volume terminals)**
 - *Their win:* cheapest possible day-one cost for **one or two doors**; all-in-one box,
@@ -41,7 +41,7 @@ terminal** (the volume leader), a **Hikvision face terminal** (premium hardware)
 - *Where it hurts:* every door is another terminal; the **~3,000-face cap** bites at scale;
   serious attendance/reporting pushes you to **ZKBioTime cloud** (recurring, data leaves
   the LAN). 
-- *Liwan answer:* one server drives **all** doors, **unlimited faces**, attendance and CSV
+- *Attendyo answer:* one server drives **all** doors, **unlimited faces**, attendance and CSV
   built in **on-prem**, **one-time** fee. The hardware route's cost multiplies with doors
   and years; ours is flat after purchase.
 
@@ -50,7 +50,7 @@ terminal** (the volume leader), a **Hikvision face terminal** (premium hardware)
   comfort.
 - *Where it hurts:* still **per-door hardware**, still steered toward the **vendor
   platform**, premium price, and the same data-residency questions for cloud features.
-- *Liwan answer:* spend on **commodity cameras** you choose, keep the brains and the data
+- *Attendyo answer:* spend on **commodity cameras** you choose, keep the brains and the data
   **on your server**, pay **once**, and rebrand it as your own.
 
 **Cloud face-attendance SaaS**
@@ -58,7 +58,7 @@ terminal** (the volume leader), a **Hikvision face terminal** (premium hardware)
 - *Where it hurts:* **biometric data in the cloud** — the hardest thing to defend under
   **Law 09-08 / CNDP** (cross-border transfer), **recurring cost forever**, **dead without
   internet**, and you don't own it.
-- *Liwan answer:* the same modern web console and daily attendance, but **on your LAN**,
+- *Attendyo answer:* the same modern web console and daily attendance, but **on your LAN**,
   **offline-capable**, **owned**, with **no subscription** and **no data leaving the
   building**.
 
@@ -77,14 +77,14 @@ terminal** (the volume leader), a **Hikvision face terminal** (premium hardware)
 
 ## 4. Honest caveats (say these before they ask)
 
-- **Hardware terminals can be cheaper for a single door** on day one. Liwan wins on
+- **Hardware terminals can be cheaper for a single door** on day one. Attendyo wins on
   **multiple doors, scale, attendance/reporting, and total cost over 3–5 years** — frame
   the comparison over time, not on day one.
-- **Liwan needs a server you run** (one commodity box). That's the price of sovereignty;
+- **Attendyo needs a server you run** (one commodity box). That's the price of sovereignty;
   for banks and government it's a feature, not a cost.
 - **Recognition is probabilistic** for everyone in this category; tune per-camera
   thresholds and keep a fallback for high-stakes doors. Nobody in this table is magic here.
-- **"On-prem" is an architecture, not a certificate.** Liwan makes CNDP/GDPR alignment far
+- **"On-prem" is an architecture, not a certificate.** Attendyo makes CNDP/GDPR alignment far
   easier; the authorisation and lawful basis are still the buyer's
   (see [`../docs/SECURITY-COMPLIANCE.md`](../docs/SECURITY-COMPLIANCE.md)).
 

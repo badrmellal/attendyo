@@ -1,6 +1,6 @@
 # Architecture
 
-How Liwan is put together, how a single recognition flows through it, what the
+How Attendyo is put together, how a single recognition flows through it, what the
 database holds, and how it scales on plain CPU hardware. The HTTP and data shapes
 here are normative in [`../CONTRACT.md`](../CONTRACT.md); this document explains the
 *why* and the runtime behaviour around them.
@@ -9,14 +9,14 @@ here are normative in [`../CONTRACT.md`](../CONTRACT.md); this document explains
 
 ## 1. Components
 
-Everything runs in Docker on one box, on one private network (`liwan`). Nothing reaches
+Everything runs in Docker on one box, on one private network (`attendyo`). Nothing reaches
 the internet.
 
 | Component            | Tech            | Port | Role                                                                 |
 |----------------------|-----------------|------|---------------------------------------------------------------------|
-| **Liwan Vision Engine** | Java + Python | 8000 | The recognition core. Stores subjects + embeddings, exposes `recognize` / `enroll`. Ships in a **CPU MobileNet** build. Incorporates open-source components — attribution in `NOTICE`. |
-| **PostgreSQL**       | Postgres        | 5432 | One instance, two schemas: the engine owns `public`; Liwan owns `liwan`. |
-| **Liwan API**        | FastAPI (Python)| 8088 | Implements the contract. The only thing the UIs and devices talk to. Calls the engine, writes the `liwan` schema, fires door drivers. |
+| **Attendyo Vision Engine** | Java + Python | 8000 | The recognition core. Stores subjects + embeddings, exposes `recognize` / `enroll`. Ships in a **CPU MobileNet** build. Incorporates open-source components — attribution in `NOTICE`. |
+| **PostgreSQL**       | Postgres        | 5432 | One instance, two schemas: the engine owns `public`; Attendyo owns `attendyo`. |
+| **Attendyo API**        | FastAPI (Python)| 8088 | Implements the contract. The only thing the UIs and devices talk to. Calls the engine, writes the `attendyo` schema, fires door drivers. |
 | **Console**          | Next.js         | 3000 | Admin dashboard: login, today overview, enrolment, attendance + CSV, live monitor, doors/cameras, settings/branding. |
 | **Gate**             | Next.js         | 3001 | Fullscreen door kiosk: webcam, greet-by-name, door-open animation. For a wall tablet. |
 | **Bridge**           | Python worker   | —    | Optional. Pulls frames from a fixed RTSP/USB camera and POSTs them to `/api/recognize`. Enabled with the `cameras` compose profile. |
@@ -29,7 +29,7 @@ the internet.
    Best for fixed cameras with no screen at the door.
 
 Both authenticate to the recognition endpoint with the shared `X-Device-Key`
-(`LIWAN_DEVICE_KEY`). Operator/admin traffic from the Console uses a JWT bearer token
+(`ATTENDYO_DEVICE_KEY`). Operator/admin traffic from the Console uses a JWT bearer token
 from `POST /api/auth/login`.
 
 ---
@@ -40,9 +40,9 @@ from `POST /api/auth/login`.
 sequenceDiagram
     autonumber
     participant D as Camera / Gate
-    participant A as Liwan API (:8088)
+    participant A as Attendyo API (:8088)
     participant C as Vision Engine (:8000)
-    participant P as Postgres (liwan)
+    participant P as Postgres (attendyo)
     participant R as Door driver
 
     D->>A: POST /api/recognize (image, camera_id?, door_id?)  [X-Device-Key]
@@ -136,7 +136,7 @@ day from its events yields the same `attendance_days` row.
 
 ---
 
-## 6. Database overview (schema `liwan`)
+## 6. Database overview (schema `attendyo`)
 
 The application schema is deliberately separate from the engine's `public` schema so the
 two never collide in the shared Postgres instance.
@@ -203,10 +203,10 @@ Indexes ship for the hot read paths: `access_events(ts DESC)`, `(member_id)`,
 
 ## 7. Scaling on CPU
 
-Liwan is designed to be *enough* on a single commodity box. There is no GPU in the path.
+Attendyo is designed to be *enough* on a single commodity box. There is no GPU in the path.
 
 **Where the work is.** Recognition cost lives almost entirely in the engine core
-(`liwan-engine-core`, MobileNet build). The Liwan API, Postgres, and the Next.js
+(`attendyo-engine-core`, MobileNet build). The Attendyo API, Postgres, and the Next.js
 apps are light. So you scale the core first.
 
 **Levers you already have (in `.env`):**

@@ -31,7 +31,7 @@ import httpx
 
 from .base import DoorActionResult, DoorContext, DoorDriver
 
-logger = logging.getLogger("liwan.doors.webhook")
+logger = logging.getLogger("attendyo.doors.webhook")
 
 # Default templates when the door config omits them.
 _DEFAULT_ON_GRANT = {"action": "open", "relock_seconds": "{relock_seconds}"}

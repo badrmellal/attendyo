@@ -1,6 +1,6 @@
-# Verticals — who buys Liwan, and why
+# Verticals — who buys Attendyo, and why
 
-Six markets, each with the **pain** they feel today, the **Liwan answer**, and the
+Six markets, each with the **pain** they feel today, the **Attendyo answer**, and the
 **buying trigger** — the moment the deal becomes urgent. Lead with **residential**: the
 lost-RFID-card story is the fastest "yes" in the Moroccan market.
 
@@ -20,7 +20,7 @@ kiosk for 20 dirhams. The syndic spends its week **re-issuing cards, chasing fee
 re-keying the system** — and a lost card is a security hole until someone notices. Visitor
 management is a paper notebook at a guard's desk.
 
-**The Liwan answer.**
+**The Attendyo answer.**
 The **face is the key** — nothing to lose, lend, or clone. Enroll a resident from **one
 photo** at move-in; the gate and lobby open when they walk up. New tenant? One photo.
 Moved out? Archive them and their access is gone instantly — no card to recover. Cleaners
@@ -43,7 +43,7 @@ requirement that **biometric and personal data not leave the institution** (regu
 CNDP scrutiny). Cloud attendance tools are often a non-starter for compliance. Card+PIN is
 shareable and audited poorly. Audit trails must be complete and defensible.
 
-**The Liwan answer.**
+**The Attendyo answer.**
 **Fully on-prem** — biometric data never leaves the bank's LAN, the single strongest line
 for a compliance review under **Law 09-08 / CNDP**. **Per-door, per-time access groups**
 (the vault door open only to two officers, only in business hours), a **complete audit
@@ -65,7 +65,7 @@ control; tight budgets that resist **recurring** software bills; **data-sovereig
 expectations (citizen-adjacent data must stay in-country, on government infrastructure);
 procurement that favours a **capital purchase** over an open-ended subscription.
 
-**The Liwan answer.**
+**The Attendyo answer.**
 A **one-time capital purchase** that fits public-procurement budgeting — no subscription to
 renew each fiscal year. **On-prem, in-country, offline-capable** (air-gappable), aligned
 with data-sovereignty expectations. **Daily attendance with CSV export** straight into
@@ -87,7 +87,7 @@ through the gates, **harsh environments** (dust, gloves, helmets) where cards ge
 damaged, multiple gates spread across a large site, and a need for **accurate hours** for
 shift pay and safety head-counts (who is on-site right now).
 
-**The Liwan answer.**
+**The Attendyo answer.**
 **Unlimited enrolment** for big, churning populations (no firmware cap), **one-photo**
 onboarding for contractors with **time-boxed access groups** that expire, **multiple gates
 from one server** over the site LAN, and **first-in/last-out daily attendance** for shift
@@ -109,7 +109,7 @@ across floors and meeting rooms; IT wants **fewer subscriptions and fewer vendor
 employee data; everyone wants something that looks modern, not a beige terminal beeping at
 the door.
 
-**The Liwan answer.**
+**The Attendyo answer.**
 **No buddy-punching** — your face is your timesheet; **first-in/last-out attendance** with
 **CSV export** to the existing HR/payroll system; **floor- and room-level access groups**;
 **one on-prem server** instead of another SaaS contract and another copy of staff data in a
@@ -135,7 +135,7 @@ checks** at the door — is the person sitting the exam the person enrolled? And
 September, thousands of new students and dozens of *vacataires* and exchange students
 must be onboarded, and last year's must stop working.
 
-**The Liwan answer.**
+**The Attendyo answer.**
 The same install, switched to **campus terminology mode** (`branding.terminology =
 "campus"`): the console speaks *Étudiants & Personnel* and *Faculté / École*, with
 **student / faculty / staff** member types first. The **face is the student card** —
@@ -157,7 +157,7 @@ signature-sheet fraud, or an exam-integrity push after an impersonation case.
 
 ## Cross-vertical cheat sheet
 
-| Vertical        | Headline pain               | Liwan one-liner                                              | Trigger to watch for                    |
+| Vertical        | Headline pain               | Attendyo one-liner                                              | Trigger to watch for                    |
 |-----------------|-----------------------------|-------------------------------------------------------------|-----------------------------------------|
 | **Residential** | Lost / cloned RFID cards    | "The face is the key — no cards, no card costs, ever."      | Card incident / syndic AGM / handover   |
 | **Banks**       | Data must not leave the bank| "Biometrics never leave your LAN — built for CNDP."         | Audit finding / rejected cloud bid       |

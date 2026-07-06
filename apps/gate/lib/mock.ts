@@ -1,5 +1,5 @@
 /**
- * Mock recognition engine for Liwan Gate.
+ * Mock recognition engine for Attendyo Gate.
  *
  * When NEXT_PUBLIC_MOCK=1 (or ?mock=1) the kiosk runs with no camera and no
  * recognition engine: `mockRecognize` returns plausible RecognizeResult objects

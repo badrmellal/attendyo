@@ -1,8 +1,8 @@
 {
-  "name": "liwan-gate",
+  "name": "attendyo-gate",
   "version": "1.0.0",
   "private": true,
-  "description": "Liwan Gate — fullscreen face-recognition door kiosk for wall tablets. White-label, on-prem.",
+  "description": "Attendyo Gate — fullscreen face-recognition door kiosk for wall tablets. White-label, on-prem.",
   "scripts": {
     "dev": "next dev -p 3001",
     "build": "next build",

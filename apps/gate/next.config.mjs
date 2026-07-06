@@ -5,7 +5,7 @@ const nextConfig = {
   output: "standalone",
   reactStrictMode: true,
   poweredByHeader: false,
-  // The kiosk talks to the Liwan API directly from the browser via
+  // The kiosk talks to the Attendyo API directly from the browser via
   // NEXT_PUBLIC_API_URL; nothing is proxied or sent to a cloud.
   env: {
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8088",

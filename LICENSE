@@ -1,4 +1,4 @@
-LIWAN — END-USER LICENSE AGREEMENT (PERPETUAL, ON-PREMISE)
+ATTENDYO — END-USER LICENSE AGREEMENT (PERPETUAL, ON-PREMISE)
 ============================================================
 
 >>> TEMPLATE — NOT LEGAL ADVICE <<<
@@ -11,7 +11,7 @@ requirements of the CNDP), and any other law applicable to the Licensee and the
 deployment. Bracketed fields [LIKE THIS] must be completed. The Licensor and the
 authors disclaim any liability arising from use of this template as-is.
 
-This EULA governs the LIWAN application software ("Software") authored and
+This EULA governs the ATTENDYO application software ("Software") authored and
 licensed by [LICENSOR LEGAL NAME], [ADDRESS], [COMMERCIAL REGISTER / ICE]
 ("Licensor"). It does NOT govern third-party components bundled with the
 Software, which are licensed separately — see the NOTICE file for the full list
@@ -23,7 +23,7 @@ applicable order or quotation ("Licensee") agrees to this EULA.
 ------------------------------------------------------------------------------
 1. DEFINITIONS
 ------------------------------------------------------------------------------
-1.1 "Software" means the LIWAN application code authored by the Licensor — the
+1.1 "Software" means the ATTENDYO application code authored by the Licensor — the
     API service, the Console and Gate web applications, the Bridge worker,
     scripts, configuration, and documentation — EXCLUDING third-party components
     listed in the NOTICE file.
@@ -180,7 +180,7 @@ on its subject matter. If any provision is held unenforceable, the remainder
 stays in effect.
 
 Copyright (c) [YEAR] [LICENSOR LEGAL NAME]. All rights reserved.
-"Liwan", "لِيوان", and the Liwan marks are trademarks of [LICENSOR LEGAL NAME]
+"Attendyo" and the Attendyo marks are trademarks of [LICENSOR LEGAL NAME]
 where applicable. Other names and marks (including those of the third-party
 components listed in the NOTICE file, and e.g. ZKTeco, Hikvision, Matrix) belong
 to their respective owners and are used for identification and comparison only.

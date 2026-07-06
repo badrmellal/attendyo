@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 /*
- * Liwan Gate — design tokens (dark-first; this is a security product).
+ * Attendyo Gate — design tokens (dark-first; this is a security product).
  * Defaults from brand/BRAND.md — "riad at night": violet-ink field, ultramarine
  * (Majorelle) primary, sand/ochre gold accent. `--primary` and `--accent` are
  * overridden at runtime from GET /api/settings → branding so the kiosk is
@@ -18,8 +18,8 @@
   --text: 236 231 244;     /* #ECE7F4 */
   --text-muted: 154 147 174;/* #9A93AE */
   --primary: 86 99 242;    /* #5663F2  ultramarine / Majorelle — brand + "granted/present" */
-  --primary-2: 124 92 255; /* #7C5CFF  violet — gradient / arch sweep */
-  --accent: 224 163 64;    /* #E0A340  sand / ochre gold — "late" + premium + arch trace */
+  --primary-2: 124 92 255; /* #7C5CFF  violet — gradient / gate sweep */
+  --accent: 224 163 64;    /* #E0A340  sand / ochre gold — "late" + premium + gate trace */
   --danger: 242 85 119;    /* #F25577  rose-red — "denied/absent" */
   --info: 139 123 255;     /* #8B7BFF  lilac — neutral secondary */
   /* Derived glow: ultramarine at ~20% alpha. Overwritten at runtime from --primary. */

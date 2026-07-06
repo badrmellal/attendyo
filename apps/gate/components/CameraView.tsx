@@ -27,7 +27,7 @@ interface CameraViewProps {
   mock?: boolean;
   /** Notified when the camera status changes (e.g. to surface a hint). */
   onStatusChange?: (status: CameraStatus) => void;
-  /** Tint the arch frame for the active result state. */
+  /** Tint the gate frame for the active result state. */
   tone?: "idle" | "granted" | "denied";
   className?: string;
 }
@@ -37,21 +37,24 @@ const CAPTURE_MAX_WIDTH = 640;
 const CAPTURE_QUALITY = 0.82;
 
 /**
- * The Liwan signature: the live camera sits *inside a Moroccan arch* (the iwan).
- * The video is clipped to the arch silhouette and a thick arch frame is stroked
+ * The Attendyo signature: the live camera sits *inside the Check Gate doorway*.
+ * The video is clipped to the doorway silhouette and a thick gate frame is stroked
  * over it — gold at idle (with a soft gold sweep tracing the outline), glowing
- * ultramarine when access is granted, flushing rose once when denied. The arch
+ * ultramarine when access is granted, flushing rose once when denied. The doorway
  * geometry is shared between the clip-path and the frame so they register exactly.
  *
  * Owns the getUserMedia stream and offscreen capture canvas. In mock mode it
  * renders a calm placeholder instead of requesting the camera.
  */
-// Shared arch path in a 0..100 (x) by 0..133.33 (y) space — a 3:4 viewport.
-// A horseshoe/round arch: straight jambs rising to a semicircular crown.
+// Shared doorway path in a 0..100 (x) by 0..133.33 (y) space — a 3:4 viewport.
+// A gentle rounded doorway: straight jambs rising well past mid-height, then a
+// single shallow, continuous arc into a flat-ish crown — NOT a horseshoe/pointed
+// Moroccan arch. Matches the "Check Gate" mark's silhouette (see brand/BRAND.md),
+// just widened to fill this 3:4 kiosk viewport.
 const ARCH_VB_W = 100;
 const ARCH_VB_H = 133.333;
 const ARCH_PATH =
-  "M6 133.333 V46 C6 21.7 25.1 6 50 6 C74.9 6 94 21.7 94 46 V133.333";
+  "M6 133.333 V30 C6 14.8 26 6 50 6 C74 6 94 14.8 94 30 V133.333";
 export const CameraView = forwardRef<CameraHandle, CameraViewProps>(
   function CameraView(
     { mock = false, onStatusChange, tone = "idle", className },
@@ -163,7 +166,7 @@ export const CameraView = forwardRef<CameraHandle, CameraViewProps>(
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [mock]);
 
-    // The arch frame color follows the recognition phase: gold while idle /
+    // The gate frame color follows the recognition phase: gold while idle /
     // scanning, ultramarine on granted, rose on denied.
     const archColor =
       tone === "granted"
@@ -186,14 +189,14 @@ export const CameraView = forwardRef<CameraHandle, CameraViewProps>(
           className,
         )}
       >
-        {/* SVG defs: the arch clip-path that masks the video into the iwan. */}
+        {/* SVG defs: the gate clip-path that masks the video into the doorway. */}
         <svg
           className="pointer-events-none absolute h-0 w-0"
           aria-hidden="true"
         >
           <defs>
-            <clipPath id="liwan-arch-clip" clipPathUnits="objectBoundingBox">
-              {/* Same arch, normalized to 0..1 so it scales with the box. */}
+            <clipPath id="attendyo-gate-clip" clipPathUnits="objectBoundingBox">
+              {/* Same doorway, normalized to 0..1 so it scales with the box. */}
               <path
                 d={`${ARCH_PATH} H6 Z`}
                 transform={`scale(${1 / ARCH_VB_W} ${1 / ARCH_VB_H})`}
@@ -202,10 +205,10 @@ export const CameraView = forwardRef<CameraHandle, CameraViewProps>(
           </defs>
         </svg>
 
-        {/* The clipped video / placeholder — the face sits inside the arch. */}
+        {/* The clipped video / placeholder — the face sits inside the gate. */}
         <div
           className="absolute inset-0 bg-surface"
-          style={{ clipPath: "url(#liwan-arch-clip)" }}
+          style={{ clipPath: "url(#attendyo-gate-clip)" }}
         >
           {!mock && (
             <video
@@ -240,7 +243,7 @@ export const CameraView = forwardRef<CameraHandle, CameraViewProps>(
           />
         </div>
 
-        {/* The arch frame, stroked over the video and registered to the clip. */}
+        {/* The gate frame, stroked over the video and registered to the clip. */}
         <svg
           className="pointer-events-none absolute inset-0 h-full w-full"
           viewBox={`0 0 ${ARCH_VB_W} ${ARCH_VB_H}`}
@@ -249,7 +252,7 @@ export const CameraView = forwardRef<CameraHandle, CameraViewProps>(
           aria-hidden="true"
           style={{ filter: archGlow, transition: "filter 300ms ease" }}
         >
-          {/* Solid arch frame — thick, takes the active phase color. */}
+          {/* Solid gate frame — thick, takes the active phase color. */}
           <path
             d={ARCH_PATH}
             stroke={archColor}
@@ -267,7 +270,7 @@ export const CameraView = forwardRef<CameraHandle, CameraViewProps>(
               strokeLinecap="round"
               vectorEffect="non-scaling-stroke"
               pathLength={100}
-              className="animate-arch-sweep"
+              className="animate-gate-sweep"
               style={{ strokeDasharray: "18 82" }}
             />
           )}

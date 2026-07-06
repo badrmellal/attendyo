@@ -1,10 +1,10 @@
 -- ===========================================================================
--- LIWAN v2 migration — idempotent. Safe to run on a v1 database AND on a
+-- ATTENDYO v2 migration — idempotent. Safe to run on a v1 database AND on a
 -- fresh database already created from the v2 schema.sql (every statement is
 -- IF NOT EXISTS / conditional). The API also applies this at startup.
 -- ===========================================================================
 
-SET search_path TO liwan, public;  -- keep public reachable: pgcrypto/uuid-ossp functions live there
+SET search_path TO attendyo, public;  -- keep public reachable: pgcrypto/uuid-ossp functions live there
 
 -- --- members: campus types + temporary-access window ----------------------
 ALTER TABLE members ADD COLUMN IF NOT EXISTS valid_from  DATE;
@@ -15,7 +15,7 @@ BEGIN
     -- widen the member_type CHECK to include campus types
     IF EXISTS (
         SELECT 1 FROM information_schema.constraint_column_usage
-        WHERE table_schema = 'liwan' AND table_name = 'members'
+        WHERE table_schema = 'attendyo' AND table_name = 'members'
           AND constraint_name = 'members_member_type_check'
     ) THEN
         ALTER TABLE members DROP CONSTRAINT members_member_type_check;

@@ -1,15 +1,15 @@
 -- ===========================================================================
--- LIWAN — Face Attendance & Access Control
--- Application schema. Lives in its own `liwan` schema inside the same Postgres
--- instance used by the Liwan Vision Engine, so the two never collide.
+-- ATTENDYO — Face Attendance & Access Control
+-- Application schema. Lives in its own `attendyo` schema inside the same Postgres
+-- instance used by the Attendyo Vision Engine, so the two never collide.
 --
 -- The vision engine owns the `public` schema (subjects, embeddings, images).
--- Liwan owns everything below: people, doors, daily attendance, access events.
+-- Attendyo owns everything below: people, doors, daily attendance, access events.
 -- ===========================================================================
 
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";          -- gen_random_uuid()
-CREATE SCHEMA IF NOT EXISTS liwan;
-SET search_path TO liwan, public;  -- keep public reachable: pgcrypto/uuid-ossp functions live there
+CREATE SCHEMA IF NOT EXISTS attendyo;
+SET search_path TO attendyo, public;  -- keep public reachable: pgcrypto/uuid-ossp functions live there
 
 -- ---------------------------------------------------------------------------
 -- Sites — one physical location (HQ, branch, residence, plant)
@@ -212,8 +212,8 @@ CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_log(action);
 -- ---------------------------------------------------------------------------
 INSERT INTO settings (key, value) VALUES
     ('branding', '{
-        "product_name": "Liwan",
-        "tagline": "The threshold that knows your people.",
+        "product_name": "Attendyo",
+        "tagline": "The face is the key.",
         "primary_color": "#5663F2",
         "accent_color": "#E0A340",
         "logo_url": null,

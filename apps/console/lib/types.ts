@@ -1,5 +1,5 @@
 /**
- * Liwan domain types — mirrored exactly from liwan/CONTRACT.md.
+ * Attendyo domain types — mirrored exactly from attendyo/CONTRACT.md.
  *
  * These are the canonical shapes the Console consumes. Do not diverge from the
  * contract here; if the API needs a different shape, update CONTRACT.md first.
@@ -104,7 +104,7 @@ export type TodayStats = {
   hourly: { hour: number; count: number }[];
 };
 
-/** Door driver kinds (liwan/db/schema.sql). */
+/** Door driver kinds (attendyo/db/schema.sql). */
 export type DoorDriver = "webhook" | "pi_gpio" | "simulation";
 export type DoorDirection = "in" | "out" | "both";
 
@@ -132,7 +132,7 @@ export type Camera = {
   created_at: string;
 };
 
-/** Week-day keys used by access-group schedules (liwan/db/schema.sql). */
+/** Week-day keys used by access-group schedules (attendyo/db/schema.sql). */
 export type ScheduleDay = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
 
 /**
@@ -142,7 +142,7 @@ export type ScheduleDay = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
 export type Schedule = Partial<Record<ScheduleDay, [string, string]>>;
 
 /**
- * Access group — which doors a member may open, and when (liwan/db/schema.sql).
+ * Access group — which doors a member may open, and when (attendyo/db/schema.sql).
  * `door_ids` empty ⇒ all doors; `schedule` `{}` ⇒ any time.
  */
 export type AccessGroup = {

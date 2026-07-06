@@ -1,7 +1,7 @@
-# Liwan Console
+# Attendyo Console
 
-Premium, dark-first admin dashboard for the **Liwan** on-premise face attendance
-& access-control system. It consumes the Liwan API described in
+Premium, dark-first admin dashboard for the **Attendyo** on-premise face attendance
+& access-control system. It consumes the Attendyo API described in
 [`../../CONTRACT.md`](../../CONTRACT.md) and is fully **white-label**: product
 name, tagline, colors, logo, and locale all come from
 `GET /api/settings → branding` — nothing brand-identifying is hard-coded.
@@ -31,7 +31,7 @@ The Console ships a rich offline layer (`lib/mock.ts`). It activates when:
 
 In mock mode the whole app renders with believable demo data: ~24 members, four
 doors, a live event stream, a full day of attendance, and working CSV export.
-Sign in with **`admin@liwan.local`** / **`liwan-admin`**.
+Sign in with **`admin@attendyo.local`** / **`attendyo-admin`**.
 
 ## Develop
 
@@ -53,7 +53,7 @@ npm run lint        # next lint
 
 | Var                   | Default                 | Purpose                                                |
 | --------------------- | ----------------------- | ------------------------------------------------------ |
-| `NEXT_PUBLIC_API_URL` | `http://localhost:8088` | Base URL the browser uses to reach the Liwan API.      |
+| `NEXT_PUBLIC_API_URL` | `http://localhost:8088` | Base URL the browser uses to reach the Attendyo API.      |
 | `NEXT_PUBLIC_MOCK`    | _(unset)_               | `1` forces the offline mock layer (demos / reviews).   |
 
 ## Architecture
@@ -87,9 +87,9 @@ and commits them to the running app on save.
 ## Docker
 
 Multi-stage build producing a standalone server (`output: "standalone"`), run as
-an unprivileged user. Wired up in the repo `docker-compose.yml` as `liwan-console`
+an unprivileged user. Wired up in the repo `docker-compose.yml` as `attendyo-console`
 on port `3000`.
 
 ```bash
-docker build --build-arg NEXT_PUBLIC_API_URL=http://localhost:8088 -t liwan-console .
+docker build --build-arg NEXT_PUBLIC_API_URL=http://localhost:8088 -t attendyo-console .
 ```

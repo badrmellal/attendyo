@@ -1,5 +1,5 @@
 # ===========================================================================
-# LIWAN GATE — multi-stage build producing a standalone Next.js server.
+# ATTENDYO GATE — multi-stage build producing a standalone Next.js server.
 # On-prem, CPU-only, no cloud at runtime. Listens on 3000 (mapped to 3001 host).
 # ===========================================================================
 

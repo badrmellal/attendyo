@@ -1,7 +1,7 @@
 import type { Config } from "tailwindcss";
 
 /**
- * Tailwind config for Liwan Gate.
+ * Tailwind config for Attendyo Gate.
  *
  * Colors map to CSS custom properties declared in globals.css so the brand can be
  * recolored at runtime from `GET /api/settings → branding` (primary/accent).
@@ -44,8 +44,8 @@ const config: Config = {
           "70%": { opacity: "0.25" },
           "100%": { transform: "scale(1.18)", opacity: "0" },
         },
-        // A soft gold light tracing along the arch outline while idle/scanning.
-        "arch-sweep": {
+        // A soft gold light tracing along the gate outline while idle/scanning.
+        "gate-sweep": {
           "0%": { strokeDashoffset: "100", opacity: "0" },
           "12%": { opacity: "0.9" },
           "88%": { opacity: "0.9" },
@@ -84,7 +84,7 @@ const config: Config = {
       animation: {
         "door-ring": "door-ring 1400ms ease-out forwards",
         "door-ring-delayed": "door-ring 1400ms ease-out 220ms forwards",
-        "arch-sweep": "arch-sweep 3.4s ease-in-out infinite",
+        "gate-sweep": "gate-sweep 3.4s ease-in-out infinite",
         "glow-pulse": "glow-pulse 2.4s ease-in-out infinite",
         "calm-shake": "calm-shake 520ms cubic-bezier(0.36,0.07,0.19,0.97) both",
         "rise-in": "rise-in 360ms ease-out both",

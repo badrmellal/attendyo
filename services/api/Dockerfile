@@ -1,5 +1,5 @@
 # ===========================================================================
-# LIWAN API — FastAPI backend.
+# ATTENDYO API — FastAPI backend.
 # Slim CPU-only image. No GPU, no cloud dependencies. Runs on any x86/ARM box.
 #
 # Build context is the REPO ROOT (see docker-compose.yml) so the image can
@@ -31,7 +31,7 @@ COPY services/api/app /app/app
 # self-heal the schema on startup even when the Postgres init script never ran.
 COPY db /app/db
 
-# Demo/admin scripts, so `docker compose exec liwan-api python scripts/seed_demo.py`
+# Demo/admin scripts, so `docker compose exec attendyo-api python scripts/seed_demo.py`
 # works out of the box with no extra install step.
 COPY scripts /app/scripts
 

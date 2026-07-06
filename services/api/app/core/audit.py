@@ -1,6 +1,6 @@
 """Append-only audit trail.
 
-Every operator action that mutates state is recorded in ``liwan.audit_log`` for
+Every operator action that mutates state is recorded in ``attendyo.audit_log`` for
 compliance (banks, government, universities). The API only ever INSERTs here —
 nothing updates or deletes audit rows.
 
@@ -27,7 +27,7 @@ from typing import Any, Mapping, Optional
 
 from . import db
 
-logger = logging.getLogger("liwan.audit")
+logger = logging.getLogger("attendyo.audit")
 
 
 def record(

@@ -10,9 +10,9 @@ interface DoorPulseProps {
 
 /**
  * The signature door-open moment: two ultramarine rings expand outward from the
- * keystone — the top centre of the arch where the face appears — with a soft
- * radial glow. Mounted only on GRANTED, unmounted on idle so the keyframes
- * restart cleanly every time. Purely decorative (aria-hidden).
+ * keystone — the top centre of the Check Gate doorway where the face appears —
+ * with a soft radial glow. Mounted only on GRANTED, unmounted on idle so the
+ * keyframes restart cleanly every time. Purely decorative (aria-hidden).
  *
  * Color comes from the `--primary` / `--primary-glow` tokens, so it follows the
  * white-label brand ultramarine.
@@ -23,8 +23,8 @@ export function DoorPulse({ active, className }: DoorPulseProps) {
   return (
     <div
       className={cn(
-        // Origin at the keystone: top-centre of the canvas, where the arch crown
-        // and the recognised face sit.
+        // Origin at the keystone: top-centre of the canvas, where the gate's
+        // crown and the recognised face sit.
         "pointer-events-none absolute inset-0 z-0 flex justify-center",
         className,
       )}

@@ -1,20 +1,19 @@
-# Liwan — One-pager (FR · EN)
+# Attendyo — One-pager (FR · EN)
 
-> **لِيوان (līwān)** — *le seuil arqué qui sépare le dehors du dedans / the arched
-> threshold between outside and in.*
+> **Le visage est la clé. / The face is the key.**
 > Contrôle d'accès & présence par reconnaissance faciale, 100 % sur site.
 > On-premise face access control & attendance.
 >
 > *White-label : le nom, les couleurs et le logo se changent depuis les réglages
-> (`GET /api/settings → branding`). « Liwan » est l'identité par défaut.*
+> (`GET /api/settings → branding`). « Attendyo » est l'identité par défaut.*
 
 ---
 
 | 🇫🇷 **Français** | 🇬🇧 **English** |
 |------------------|-----------------|
-| **Le seuil qui reconnaît les vôtres.** | **The threshold that knows your people.** |
+| **Le visage est la clé.** | **The face is the key.** |
 | Contrôle d'accès et gestion de présence par reconnaissance faciale, qui vit **entièrement chez vous** : pas de cloud, pas d'abonnement, aucune carte RFID à perdre. Une photo suffit pour inscrire une personne ; la porte s'ouvre quand le système la reconnaît ; chaque entrée et sortie est enregistrée pour la journée. | Face access control and attendance that lives **entirely on your premises**: no cloud, no subscription, no RFID card to lose. One photo enrolls a person; the door opens when it recognises them; every entry and exit is logged for the day. |
-| **Pourquoi Liwan** | **Why Liwan** |
+| **Pourquoi Attendyo** | **Why Attendyo** |
 | • **Licence unique, à vie.** Payez une fois, c'est à vous. Aucun frais mensuel, par porte ou par utilisateur. | • **One-time, perpetual licence.** Pay once, own it. No monthly, per-door, or per-seat fees. |
 | • **Sur site, vos données restent sur votre LAN.** Atout majeur pour la **Loi 09-08 / CNDP**. | • **On-prem; your data stays on your LAN.** A strong fit for **Law 09-08 / CNDP**. |
 | • **Visages illimités.** Pas de plafond firmware (les terminaux matériels plafonnent, ex. ~3 000 visages). | • **Unlimited enrolled faces.** No firmware cap (hardware terminals top out, e.g. ~3,000 faces). |
@@ -29,15 +28,15 @@
 | **Conformité** | **Compliance** |
 | Architecture sur site, **les données ne quittent jamais le bâtiment**. L'autorisation **CNDP** et la base légale restent à la charge du client (voir doc sécurité). *Aucune certification revendiquée.* | On-prem by design, **data never leaves the building**. **CNDP** authorisation and lawful basis remain the buyer's responsibility (see security doc). *No certifications claimed.* |
 | **Moteur** | **Engine** |
-| Propulsé par le **Liwan Vision Engine**, exécuté 100 % localement (composants open-source ; attribution complète dans le fichier NOTICE). | Powered by the **Liwan Vision Engine**, run fully on-site (open-source components; full attribution in the NOTICE file). |
+| Propulsé par le **Attendyo Vision Engine**, exécuté 100 % localement (composants open-source ; attribution complète dans le fichier NOTICE). | Powered by the **Attendyo Vision Engine**, run fully on-site (open-source components; full attribution in the NOTICE file). |
 
 ---
 
 **FR — En une phrase :** Achetez-le une fois, installez-le sur votre serveur, inscrivez vos
-gens d'une photo, et laissez Liwan ouvrir la porte au seuil — vos données ne quittent
-jamais votre LAN.
+gens d'une photo, et laissez Attendyo ouvrir la porte — vos données ne quittent jamais
+votre LAN.
 
 **EN — In one line:** Buy it once, install it on your server, enroll your people from a
-photo, and let Liwan open the door at the threshold — your data never leaves your LAN.
+photo, and let Attendyo open the door — your data never leaves your LAN.
 
 > Contact / Devis · Contact / Quote : _<intégrateur — à compléter>_

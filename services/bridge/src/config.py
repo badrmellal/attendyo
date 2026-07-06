@@ -1,11 +1,11 @@
 """
-LIWAN Bridge — configuration & camera discovery.
+ATTENDYO Bridge — configuration & camera discovery.
 
 The bridge is a headless worker for FIXED cameras (RTSP / USB). It needs two
 things to run:
 
-  1. Where the Liwan API is and how to authenticate to it as a device
-     (``LIWAN_API_URL`` + ``LIWAN_DEVICE_KEY``).
+  1. Where the Attendyo API is and how to authenticate to it as a device
+     (``ATTENDYO_API_URL`` + ``ATTENDYO_DEVICE_KEY``).
   2. The list of cameras to watch — each with a video ``source`` and the
      ``camera_id`` / ``door_id`` the API uses for decisioning.
 
@@ -15,9 +15,9 @@ Cameras can be discovered in two ways (in priority order):
     is the fully-offline path: no operator credentials needed, the integrator
     pins exactly which streams this box pulls. Preferred for air-gapped sites.
 
-  * **Liwan API** — ``GET /api/cameras``. That endpoint is operator-authed
-    (``Authorization: Bearer``), so if used, set ``LIWAN_OPERATOR_EMAIL`` /
-    ``LIWAN_OPERATOR_PASSWORD`` and the bridge will log in to fetch the list.
+  * **Attendyo API** — ``GET /api/cameras``. That endpoint is operator-authed
+    (``Authorization: Bearer``), so if used, set ``ATTENDYO_OPERATOR_EMAIL`` /
+    ``ATTENDYO_OPERATOR_PASSWORD`` and the bridge will log in to fetch the list.
     The device key alone cannot list cameras (it only opens ``/api/recognize``).
 
 Nothing here is hard-coded to a site, IP, or door — every value comes from the
@@ -35,7 +35,7 @@ from typing import Any, Optional
 
 from dotenv import load_dotenv
 
-log = logging.getLogger("liwan.bridge.config")
+log = logging.getLogger("attendyo.bridge.config")
 
 # Load a local .env when present (dev / bare-metal). In Docker the values are
 # injected as real env vars and this is a harmless no-op.
@@ -92,7 +92,7 @@ class CameraConfig:
     """
     One video source the bridge pulls from.
 
-    ``camera_id`` / ``door_id`` are the identifiers the Liwan API expects on
+    ``camera_id`` / ``door_id`` are the identifiers the Attendyo API expects on
     ``POST /api/recognize`` — they drive threshold, access-group and schedule
     decisions server-side. ``recognition_threshold`` / ``det_prob_threshold``
     are carried only for local gating/observability; the API remains the source
@@ -124,7 +124,7 @@ class CameraConfig:
 
     @staticmethod
     def from_api(row: dict[str, Any]) -> "CameraConfig":
-        """Build from a Liwan API ``/api/cameras`` row."""
+        """Build from a Attendyo API ``/api/cameras`` row."""
         return CameraConfig(
             name=str(row.get("name") or row.get("id") or "camera"),
             source=str(row.get("source") or "").strip(),
@@ -224,20 +224,20 @@ def load() -> BridgeConfig:
     list. Raises :class:`ConfigError` if required values are missing or no
     usable cameras are found.
     """
-    api_url = _get("LIWAN_API_URL")
+    api_url = _get("ATTENDYO_API_URL")
     if not api_url:
-        raise ConfigError("LIWAN_API_URL is required (e.g. http://liwan-api:8088)")
+        raise ConfigError("ATTENDYO_API_URL is required (e.g. http://attendyo-api:8088)")
     api_url = api_url.rstrip("/")
 
-    device_key = _get("LIWAN_DEVICE_KEY")
+    device_key = _get("ATTENDYO_DEVICE_KEY")
     if not device_key:
-        raise ConfigError("LIWAN_DEVICE_KEY is required (shared device secret)")
+        raise ConfigError("ATTENDYO_DEVICE_KEY is required (shared device secret)")
 
     cfg = BridgeConfig(
         api_url=api_url,
         device_key=device_key,
-        operator_email=_get("LIWAN_OPERATOR_EMAIL"),
-        operator_password=_get("LIWAN_OPERATOR_PASSWORD"),
+        operator_email=_get("ATTENDYO_OPERATOR_EMAIL"),
+        operator_password=_get("ATTENDYO_OPERATOR_PASSWORD"),
         cameras_inline=_get("CAMERAS"),
         cameras_file=_get("CAMERAS_FILE"),
         request_interval_s=_get_float("BRIDGE_REQUEST_INTERVAL_S", 1.5),
@@ -255,8 +255,8 @@ def load() -> BridgeConfig:
     if not cfg.cameras:
         raise ConfigError(
             "no enabled cameras found. Set CAMERAS / CAMERAS_FILE, or configure "
-            "cameras in Liwan and provide LIWAN_OPERATOR_EMAIL / "
-            "LIWAN_OPERATOR_PASSWORD so the bridge can call GET /api/cameras."
+            "cameras in Attendyo and provide ATTENDYO_OPERATOR_EMAIL / "
+            "ATTENDYO_OPERATOR_PASSWORD so the bridge can call GET /api/cameras."
         )
     return cfg
 
@@ -335,7 +335,7 @@ def _load_api_cameras(cfg: BridgeConfig) -> list[CameraConfig]:
         raise ConfigError(
             "no local CAMERAS provided and no operator credentials set. "
             "Provide CAMERAS / CAMERAS_FILE for offline use, or set "
-            "LIWAN_OPERATOR_EMAIL and LIWAN_OPERATOR_PASSWORD to list cameras "
+            "ATTENDYO_OPERATOR_EMAIL and ATTENDYO_OPERATOR_PASSWORD to list cameras "
             "via the API."
         )
 

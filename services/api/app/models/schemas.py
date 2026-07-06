@@ -1,6 +1,6 @@
 """Request/response schemas.
 
-These mirror the TypeScript ``Core types`` in ``liwan/CONTRACT.md`` field-for-field
+These mirror the TypeScript ``Core types`` in ``attendyo/CONTRACT.md`` field-for-field
 so the Console/Gate clients deserialize without surprises. Datetimes serialize to
 ISO-8601 strings (Pydantic default), matching the ``string`` types in the contract.
 """
@@ -296,7 +296,7 @@ class StatsToday(BaseModel):
 # Settings / branding
 # --------------------------------------------------------------------------- #
 class Branding(BaseModel):
-    product_name: str = "Liwan"
+    product_name: str = "Attendyo"
     tagline: Optional[str] = None
     primary_color: str = "#5663F2"
     accent_color: str = "#E0A340"

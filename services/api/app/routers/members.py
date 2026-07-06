@@ -50,7 +50,7 @@ from ..models.schemas import (
     MemberUpdate,
 )
 
-logger = logging.getLogger("liwan.members")
+logger = logging.getLogger("attendyo.members")
 
 router = APIRouter(prefix="/api/members", tags=["members"])
 

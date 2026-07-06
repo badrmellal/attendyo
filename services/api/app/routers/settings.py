@@ -4,7 +4,7 @@
 * ``PUT /api/settings`` → update branding and/or attendance (**admin only**).
 
 Branding powers the white-label: Console and Gate read ``product_name``,
-``primary_color``, ``locale`` … from here and never hard-code "Liwan". Defaults
+``primary_color``, ``locale`` … from here and never hard-code "Attendyo". Defaults
 come from ``brand/BRAND.md`` and are seeded by ``db/schema.sql``.
 """
 
@@ -25,14 +25,14 @@ from ..models.schemas import (
     SettingsUpdate,
 )
 
-logger = logging.getLogger("liwan.settings")
+logger = logging.getLogger("attendyo.settings")
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
 # Defaults mirror brand/BRAND.md and the schema seed, used if a key is missing.
 _DEFAULT_BRANDING = Branding(
-    product_name="Liwan",
-    tagline="The threshold that knows your people.",
+    product_name="Attendyo",
+    tagline="The face is the key.",
     primary_color="#5663F2",
     accent_color="#E0A340",
     logo_url=None,

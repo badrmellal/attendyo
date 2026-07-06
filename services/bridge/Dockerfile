@@ -1,6 +1,6 @@
 # ===========================================================================
-# LIWAN Bridge — headless camera worker.
-# Pulls frames from fixed RTSP/USB cameras and posts them to the Liwan API
+# ATTENDYO Bridge — headless camera worker.
+# Pulls frames from fixed RTSP/USB cameras and posts them to the Attendyo API
 # recognition endpoint. CPU-only, on-prem, no cloud dependencies.
 # ===========================================================================
 FROM python:3.12-slim

@@ -1,1 +1,1 @@
-"""Pydantic schemas mirroring the contract types in liwan/CONTRACT.md."""
+"""Pydantic schemas mirroring the contract types in attendyo/CONTRACT.md."""

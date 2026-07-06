@@ -1,23 +1,23 @@
-LIWAN — THIRD-PARTY ATTRIBUTIONS AND NOTICES
+ATTENDYO — THIRD-PARTY ATTRIBUTIONS AND NOTICES
 ============================================================
 
-The LIWAN product is distributed together with third-party open-source software.
-The LIWAN application code is licensed under the terms in the LICENSE file (a
+The ATTENDYO product is distributed together with third-party open-source software.
+The ATTENDYO application code is licensed under the terms in the LICENSE file (a
 commercial / perpetual EULA template). The third-party components listed below
 are NOT covered by that EULA; they are licensed to you under their own licenses,
-whose terms govern those components. Nothing in the LIWAN EULA limits your rights
+whose terms govern those components. Nothing in the ATTENDYO EULA limits your rights
 under, or relieves you of obligations under, these licenses.
 
-This NOTICE file must be retained and distributed with LIWAN. Do not remove or
+This NOTICE file must be retained and distributed with ATTENDYO. Do not remove or
 alter it (see EULA §4(b)).
 
 ------------------------------------------------------------------------------
 1. CompreFace — face recognition engine
 ------------------------------------------------------------------------------
-LIWAN bundles and runs the CompreFace recognition engine as its recognition core
-("Liwan Vision Engine" in product materials). The compose services
-liwan-engine-api, liwan-engine-admin, liwan-engine-core, and liwan-engine-ui in
-docker-compose.yml run the official, unmodified CompreFace images. LIWAN calls
+ATTENDYO bundles and runs the CompreFace recognition engine as its recognition core
+("Attendyo Vision Engine" in product materials). The compose services
+attendyo-engine-api, attendyo-engine-admin, attendyo-engine-core, and attendyo-engine-ui in
+docker-compose.yml run the official, unmodified CompreFace images. ATTENDYO calls
 CompreFace over its HTTP API and does not modify the CompreFace source.
 
     Component:  CompreFace
@@ -39,28 +39,28 @@ specific language governing permissions and limitations under the License.
 CompreFace itself incorporates further third-party software (including machine-
 learning models and libraries) under their respective licenses; refer to the
 CompreFace repository's own NOTICE/LICENSE and model documentation for those
-attributions. The CPU build referenced by LIWAN uses a MobileNet-based detection/
+attributions. The CPU build referenced by ATTENDYO uses a MobileNet-based detection/
 recognition pipeline; consult the CompreFace project for the exact model
 provenance and licenses applicable to the version you deploy.
 
 ------------------------------------------------------------------------------
 2. Apache License 2.0 — obligations carried forward
 ------------------------------------------------------------------------------
-Because LIWAN redistributes CompreFace (Apache-2.0), LIWAN and any party who
-further distributes LIWAN must, with respect to that component:
+Because ATTENDYO redistributes CompreFace (Apache-2.0), ATTENDYO and any party who
+further distributes ATTENDYO must, with respect to that component:
   (a) include a copy of the Apache License 2.0;
   (b) retain all copyright, patent, trademark, and attribution notices;
   (c) retain this NOTICE file and the attributions it contains; and
-  (d) state any significant changes made to the licensed files (LIWAN makes no
+  (d) state any significant changes made to the licensed files (ATTENDYO makes no
       modifications to CompreFace source; it runs the official images).
 
 The Apache-2.0 license text is available at the URL above and should accompany
-distributions of LIWAN (e.g. as THIRD-PARTY-LICENSES/Apache-2.0.txt).
+distributions of ATTENDYO (e.g. as THIRD-PARTY-LICENSES/Apache-2.0.txt).
 
 ------------------------------------------------------------------------------
 3. Other components
 ------------------------------------------------------------------------------
-The LIWAN application services and apps depend on additional open-source
+The ATTENDYO application services and apps depend on additional open-source
 libraries and base images (for example, the Python/FastAPI ecosystem for the API
 and Bridge, the Next.js/React ecosystem for the Console and Gate, and PostgreSQL
 for storage). Each is governed by its own license (commonly MIT, BSD, Apache-2.0,
@@ -78,7 +78,7 @@ NOTICE as THIRD-PARTY-LICENSES/.
 4. Trademarks
 ------------------------------------------------------------------------------
 "CompreFace" and "Exadel" are marks of Exadel, Inc. "PostgreSQL" is a trademark
-of the PostgreSQL Community Association. Names used for comparison in LIWAN sales
+of the PostgreSQL Community Association. Names used for comparison in ATTENDYO sales
 material (e.g. ZKTeco, Hikvision, Matrix COSEC) are trademarks of their
 respective owners and are referenced solely for factual, descriptive comparison;
 their use does not imply affiliation or endorsement.
@@ -91,5 +91,5 @@ in use, for example:
     - Python deps:   pip-licenses  (or your poetry/uv equivalent)
     - Node deps:     license-checker / npx license-checker --production
     - Apache-2.0:    include the full license text once at the top level
-Ship that directory together with LIWAN so every redistribution remains compliant
+Ship that directory together with ATTENDYO so every redistribution remains compliant
 with the bundled licenses above.

@@ -3,7 +3,7 @@
 Builds a realistic small organisation so the Console dashboard, attendance sheet,
 live monitor, reports, presence view, alerts and the Gate kiosk all have
 something to show with zero cameras and no recognition engine (pair with
-``LIWAN_DEMO_MODE=1``).
+``ATTENDYO_DEMO_MODE=1``).
 
 Produces:
 * 1 site (HQ Casablanca, 09:00–18:00, 10-min grace).
@@ -37,12 +37,12 @@ from typing import Any, Optional
 
 from .core import db, security
 
-logger = logging.getLogger("liwan.demo")
+logger = logging.getLogger("attendyo.demo")
 
 # Extra demo operator logins (created idempotently, never overwritten).
 DEMO_USERS = [
-    ("operator@liwan.local", "liwan-operator", "Opératrice Démo", "operator"),
-    ("viewer@liwan.local", "liwan-viewer", "Observateur Démo", "viewer"),
+    ("operator@attendyo.local", "attendyo-operator", "Opératrice Démo", "operator"),
+    ("viewer@attendyo.local", "attendyo-viewer", "Observateur Démo", "viewer"),
 ]
 
 # Deterministic-ish but varied; fixed seed keeps demos reproducible.
@@ -187,7 +187,7 @@ def _create_members() -> list[dict[str, Any]]:
                 member_type,
                 dept_val,
                 title_val,
-                f"{first.lower()}.{re.sub(r'[^a-z]', '', last.lower())}@demo.liwan.local",
+                f"{first.lower()}.{re.sub(r'[^a-z]', '', last.lower())}@demo.attendyo.local",
                 valid_from,
                 valid_until,
             ),

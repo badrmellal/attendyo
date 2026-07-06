@@ -41,7 +41,7 @@ type BrandingContextValue = {
 
 const BrandingContext = createContext<BrandingContextValue | null>(null);
 
-const THEME_KEY = "liwan.theme";
+const THEME_KEY = "attendyo.theme";
 
 function readStoredTheme(): Theme {
   if (typeof window === "undefined") return "dark";

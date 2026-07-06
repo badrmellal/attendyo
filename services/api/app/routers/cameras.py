@@ -18,7 +18,7 @@ from starlette.concurrency import run_in_threadpool
 from ..core import audit, db, security
 from ..models.schemas import Camera, CameraCreate, CameraUpdate
 
-logger = logging.getLogger("liwan.cameras.router")
+logger = logging.getLogger("attendyo.cameras.router")
 
 router = APIRouter(prefix="/api/cameras", tags=["cameras"])
 

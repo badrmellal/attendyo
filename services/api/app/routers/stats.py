@@ -21,7 +21,7 @@ from starlette.concurrency import run_in_threadpool
 from ..core import db, media, security
 from ..models.schemas import AccessEvent, HourlyBucket, StatsToday
 
-logger = logging.getLogger("liwan.stats")
+logger = logging.getLogger("attendyo.stats")
 
 router = APIRouter(prefix="/api/stats", tags=["stats"])
 

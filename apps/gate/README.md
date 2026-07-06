@@ -1,4 +1,4 @@
-# Liwan Gate
+# Attendyo Gate
 
 Fullscreen face-recognition **door kiosk** for wall tablets. Mounted next to a
 door, it watches for a known face, greets the person by name, animates the
@@ -6,7 +6,7 @@ door-open moment, and records the check-in / check-out. Built for an unattended
 terminal that runs all day on the local network — no cloud, no telemetry, no
 subscription.
 
-One of two front-ends over the Liwan API (see `CONTRACT.md`):
+One of two front-ends over the Attendyo API (see `CONTRACT.md`):
 
 - **Console** (`apps/console`, :3000) — admin dashboard.
 - **Gate** (`apps/gate`, :3001) — this app, the door terminal.
@@ -44,10 +44,10 @@ Copy `.env.example` to `.env.local`. All vars are build-time inlined
 
 | Variable                  | Purpose                                                        |
 | ------------------------- | -------------------------------------------------------------- |
-| `NEXT_PUBLIC_API_URL`     | Liwan API base (default `http://localhost:8088`).              |
+| `NEXT_PUBLIC_API_URL`     | Attendyo API base (default `http://localhost:8088`).              |
 | `NEXT_PUBLIC_DEVICE_KEY`  | Shared secret sent as `X-Device-Key`. Must match the API.      |
-| `NEXT_PUBLIC_CAMERA_ID`   | This terminal's camera (`liwan.cameras.id`).                   |
-| `NEXT_PUBLIC_DOOR_ID`     | This terminal's door (`liwan.doors.id`).                       |
+| `NEXT_PUBLIC_CAMERA_ID`   | This terminal's camera (`attendyo.cameras.id`).                   |
+| `NEXT_PUBLIC_DOOR_ID`     | This terminal's door (`attendyo.doors.id`).                       |
 | `NEXT_PUBLIC_MOCK`        | `1` to simulate recognitions on a timer with no camera/engine. |
 
 ### Per-tablet overrides
@@ -88,7 +88,7 @@ docker compose up -d        # Gate is published on :3001
 ```
 
 The image is a standalone Next.js server (`output: "standalone"`), runs as an
-unprivileged user, and makes no outbound calls beyond the Liwan API on your LAN.
+unprivileged user, and makes no outbound calls beyond the Attendyo API on your LAN.
 
 ## Kiosk tips
 

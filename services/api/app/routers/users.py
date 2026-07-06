@@ -20,7 +20,7 @@ from starlette.concurrency import run_in_threadpool
 from ..core import audit, db, security
 from ..models.schemas import UserCreate, UserOut, UserUpdate
 
-logger = logging.getLogger("liwan.users")
+logger = logging.getLogger("attendyo.users")
 
 router = APIRouter(prefix="/api/users", tags=["users"])
 

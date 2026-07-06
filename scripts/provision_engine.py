@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-provision_engine.py — one-command bootstrap of the Liwan Vision Engine.
+provision_engine.py — one-command bootstrap of the Attendyo Vision Engine.
 
 Instead of opening the engine console at :8000 and clicking through it, an
 installer runs this once after `docker compose up -d`:
@@ -41,8 +41,8 @@ from pathlib import Path
 from typing import Any
 
 DEFAULT_ENGINE_URL = "http://localhost:8000"
-DEFAULT_APP_NAME = "liwan"
-DEFAULT_SERVICE_NAME = "liwan-recognition"
+DEFAULT_APP_NAME = "attendyo"
+DEFAULT_SERVICE_NAME = "attendyo-recognition"
 TIMEOUT_S = 20
 
 FALLBACK_MSG = (
@@ -296,7 +296,7 @@ def write_env(env_path: Path, api_key: str) -> None:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description=(
-            "Bootstrap the Liwan Vision Engine: register the admin, create the "
+            "Bootstrap the Attendyo Vision Engine: register the admin, create the "
             "application and Recognition service, and print the API key."
         ),
         epilog=FALLBACK_MSG,
@@ -307,8 +307,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="engine admin email to register / log in with")
     parser.add_argument("--password", required=True,
                         help="engine admin password")
-    parser.add_argument("--first-name", default="Liwan",
-                        help="admin first name (default: Liwan)")
+    parser.add_argument("--first-name", default="Attendyo",
+                        help="admin first name (default: Attendyo)")
     parser.add_argument("--last-name", default="Admin",
                         help="admin last name (default: Admin)")
     parser.add_argument("--app-name", default=DEFAULT_APP_NAME,
@@ -356,11 +356,11 @@ def main(argv: list[str] | None = None) -> int:
                   f"  ENGINE_API_KEY={api_key}", file=sys.stderr)
             return 1
         print("\nDone. Restart the API so it picks up the key:")
-        print("  docker compose up -d liwan-api")
+        print("  docker compose up -d attendyo-api")
     else:
         print("\nPaste it into .env as ENGINE_API_KEY (or re-run with "
               "--write-env), then:")
-        print("  docker compose up -d liwan-api")
+        print("  docker compose up -d attendyo-api")
 
     return 0
 

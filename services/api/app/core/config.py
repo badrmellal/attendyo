@@ -1,7 +1,7 @@
 """Runtime configuration, loaded from environment variables.
 
-All settings come from the process environment (see ``liwan/.env.example`` and the
-``liwan-api`` service block in ``docker-compose.yml``). Nothing here reaches a
+All settings come from the process environment (see ``attendyo/.env.example`` and the
+``attendyo-api`` service block in ``docker-compose.yml``). Nothing here reaches a
 cloud service; this is an on-prem, offline product.
 """
 
@@ -28,21 +28,21 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # --- Database (shared Postgres instance; Liwan owns the ``liwan`` schema) ---
-    db_host: str = "liwan-postgres-db"
+    # --- Database (shared Postgres instance; Attendyo owns the ``attendyo`` schema) ---
+    db_host: str = "attendyo-postgres-db"
     db_port: int = 5432
-    db_name: str = "liwan"
+    db_name: str = "attendyo"
     db_user: str = "postgres"
     db_password: str = "change-me-in-production"
     db_min_conn: int = 1
     db_max_conn: int = 10
 
-    # --- Liwan Vision Engine (recognition core) ---------------------------------
+    # --- Attendyo Vision Engine (recognition core) ---------------------------------
     # Canonical env vars are ENGINE_URL / ENGINE_API_KEY. The legacy
     # COMPREFACE_API_URL / COMPREFACE_API_KEY names are still accepted as
     # fallbacks so existing installs keep working after an upgrade.
     engine_url: str = Field(
-        default="http://liwan-engine-api:8080",
+        default="http://attendyo-engine-api:8080",
         validation_alias=AliasChoices("engine_url", "compreface_api_url"),
     )
     engine_api_key: str = Field(
@@ -67,17 +67,17 @@ class Settings(BaseSettings):
         return value
 
     # --- Auth / security -------------------------------------------------------
-    liwan_jwt_secret: str = "change-me-to-a-long-random-string"
+    attendyo_jwt_secret: str = "change-me-to-a-long-random-string"
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 60 * 12  # 12h operator session
-    liwan_admin_email: str = "admin@liwan.local"
-    liwan_admin_password: str = "liwan-admin"
-    liwan_device_key: str = "change-me-device-shared-secret"
+    attendyo_admin_email: str = "admin@attendyo.local"
+    attendyo_admin_password: str = "attendyo-admin"
+    attendyo_device_key: str = "change-me-device-shared-secret"
 
     # --- Behaviour flags -------------------------------------------------------
-    # LIWAN_DEMO_MODE=1 lets /api/recognize return a random active demo member so
+    # ATTENDYO_DEMO_MODE=1 lets /api/recognize return a random active demo member so
     # the Gate/Console can be demoed with no camera and no vision engine.
-    liwan_demo_mode: bool = False
+    attendyo_demo_mode: bool = False
 
     # --- Storage ---------------------------------------------------------------
     media_root: str = "/data/media"

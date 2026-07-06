@@ -29,7 +29,7 @@ from typing import Any, Optional
 
 from ..core import db
 
-logger = logging.getLogger("liwan.attendance")
+logger = logging.getLogger("attendyo.attendance")
 
 
 def _site_for_door(door_id: Optional[str]) -> Optional[dict[str, Any]]:

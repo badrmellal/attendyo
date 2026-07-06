@@ -3,27 +3,27 @@
 A 12-slide narrative for a 10–15 minute sales meeting with a Moroccan enterprise,
 residence syndic, bank, municipality, industrial, or **university** buyer. Each slide gives the **on-slide
 content** (keep it sparse — visuals over text) and **speaker notes** (what you actually
-say). Brand the deck from the deployment's identity; "Liwan / لِيوان" is the default.
+say). Brand the deck from the deployment's identity; "Attendyo" is the default.
 
-> Design language (from `brand/BRAND.md`): the *iwan* arch motif on a warm violet-ink
-> field; ultramarine/Majorelle (`#5663F2`) for the brand and "granted"; sand gold
-> (`#E0A340`) for premium accents and the arch trace; a Fraunces serif wordmark; generous
-> space; tabular numbers for any stats. Calm and sovereign, never hypey.
+> Design language (from `brand/BRAND.md`): the Check Gate mark (a rounded doorway with a
+> checkmark resolving inside it) on a warm violet-ink field; ultramarine/Majorelle
+> (`#5663F2`) for the brand and "granted"; sand gold (`#E0A340`) for premium accents and
+> the gate trace; a Fraunces serif wordmark; generous space; tabular numbers for any
+> stats. Calm and sovereign, never hypey.
 
 ---
 
 ## Slide 1 — Title / cold open
 
-**On slide:** `لِيوان · LIWAN` wordmark. Tagline: *"The threshold that knows your people."*
-A single dark hero image: a Moroccan **arch**, an amber line tracing its curve, a name
-rising inside it — "Bienvenue, Yassine." Sub-line: *On-prem face access & attendance.
+**On slide:** `ATTENDYO` wordmark with the Check Gate mark. Tagline: *"The face is the key."*
+A single dark hero image: a rounded doorway frame, an amber line tracing its outline, a
+name rising inside it — "Bienvenue, Yassine." Sub-line: *On-prem face access & attendance.
 Sold once. Owned forever.*
 
-**Speaker notes:** "A *līwān* is the arched hall that fronts a Moroccan courtyard — the
-threshold you pass through to enter. That's the whole product in one word: it stands at
-your threshold, recognises the people who belong, opens the door for them, and writes down
-when they came and went — all on your own server, nothing in the cloud. Let me show you why
-that matters for [their world]."
+**Speaker notes:** "The whole product is one idea: the face is the key. It recognises the
+people who belong, opens the door for them, and writes down when they came and went — all
+on your own server, nothing in the cloud. Let me show you why that matters for [their
+world]."
 
 ---
 
@@ -55,10 +55,10 @@ and exit is recorded for the day, automatically. No cards, no PINs, no queue."
 
 ## Slide 4 — How it works (architecture, simply)
 
-**On slide:** the simplified diagram — *Camera / tablet → Liwan server (recognition + DB) →
+**On slide:** the simplified diagram — *Camera / tablet → Attendyo server (recognition + DB) →
 door*. Caption: **One server. Many doors. All on your LAN.**
 
-**Speaker notes:** "A camera or a wall tablet sends a face to your Liwan server. The server
+**Speaker notes:** "A camera or a wall tablet sends a face to your Attendyo server. The server
 recognises it, decides if this person may open this door at this time, opens it, and logs
 it. One commodity CPU box drives every door over your local network. Nothing leaves the
 building — there's no internet in this picture at all."
@@ -74,7 +74,7 @@ building — there's no internet in this picture at all."
 - Runs on plain CPU — *no GPU, no terminal per door*
 - One photo to enroll — *no cards to lose*
 
-**Speaker notes:** "Five things make Liwan different. You **buy it once**. Your **data stays
+**Speaker notes:** "Five things make Attendyo different. You **buy it once**. Your **data stays
 on your LAN**. You enroll **unlimited people**. It runs on a **plain server** you probably
 already have. And you onboard someone with **one photo** — no card to ever lose. Every one
 of these is a direct answer to a cost or risk on slide 2."
@@ -90,7 +90,7 @@ certification claimed; authorisation is the controller's.*
 **Speaker notes:** "This is the slide your security and legal people care about. Because
 everything runs on-prem, biometric data **never leaves your building or the country** —
 that's the hardest thing to say with any cloud product, and it's exactly what the CNDP
-scrutinises for biometrics. To be honest and precise: Liwan gives you the *architecture*;
+scrutinises for biometrics. To be honest and precise: Attendyo gives you the *architecture*;
 the CNDP authorisation and lawful basis are still yours to obtain. We make that far easier;
 we don't pretend to be a certificate." *(Honesty here builds trust with banks/government.)*
 
@@ -112,20 +112,20 @@ screen." *(If possible, do a 60-second live demo here instead of the screenshot.
 
 ## Slide 8 — Versus the alternatives
 
-**On slide:** the condensed comparison row: **Liwan vs ZKTeco terminal vs Hikvision vs cloud
-SaaS** across *cost model, data location, face cap, recurring cost.* Liwan column glows.
+**On slide:** the condensed comparison row: **Attendyo vs ZKTeco terminal vs Hikvision vs cloud
+SaaS** across *cost model, data location, face cap, recurring cost.* Attendyo column glows.
 
 **Speaker notes:** "Against a ZKTeco or Hikvision terminal, you avoid buying a box per door
 and the ~3,000-face cap, and you keep the data on-prem. Against a cloud attendance service,
 you avoid the subscription forever and the data leaving the country. Hardware can be cheaper
 for a single door on day one — I'll be straight about that — but across multiple doors and a
-few years, Liwan wins on total cost and on sovereignty." *(See COMPARISON.md / PRICING.md.)*
+few years, Attendyo wins on total cost and on sovereignty." *(See COMPARISON.md / PRICING.md.)*
 
 ---
 
 ## Slide 9 — The cost story
 
-**On slide:** two curves over 5 years — *per-terminal + cloud* climbing; *Liwan* flat after
+**On slide:** two curves over 5 years — *per-terminal + cloud* climbing; *Attendyo* flat after
 a one-time step. Caption: **Pay once. Flat forever. Support is optional.**
 
 **Speaker notes:** "Their cost grows with every door and every year of subscription. Ours is
@@ -138,7 +138,7 @@ suggested list price.)*
 
 ## Slide 10 — Built for your vertical
 
-**On slide:** one panel for the buyer in the room — *pain → Liwan answer → trigger* —
+**On slide:** one panel for the buyer in the room — *pain → Attendyo answer → trigger* —
 pulled from VERTICALS.md (residence / bank / municipality / industrial / corporate /
 university).
 

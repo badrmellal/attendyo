@@ -1,14 +1,14 @@
-# LIWAN Bridge — headless camera worker
+# ATTENDYO Bridge — headless camera worker
 
 The Bridge is for **fixed cameras** (RTSP IP cameras or USB cameras) at doors
 where there is **no kiosk browser**. It pulls frames, runs a cheap presence
-gate, and posts candidate frames to the Liwan API recognition endpoint. The API
+gate, and posts candidate frames to the Attendyo API recognition endpoint. The API
 does all the decisioning — threshold, access group, schedule, attendance
 roll-up, and firing the door driver. The Bridge never decides access itself and
 never talks to the vision engine or the door hardware directly.
 
 ```
-Camera (RTSP/USB) ─► Bridge ─► POST /api/recognize (X-Device-Key) ─► Liwan API
+Camera (RTSP/USB) ─► Bridge ─► POST /api/recognize (X-Device-Key) ─► Attendyo API
 ```
 
 On-prem, CPU-only, no cloud calls. One worker thread per camera; reconnects on
@@ -35,12 +35,12 @@ stream drop.
 
 | Variable | Required | Default | Purpose |
 |---|---|---|---|
-| `LIWAN_API_URL` | yes | — | Liwan API base, e.g. `http://liwan-api:8088` |
-| `LIWAN_DEVICE_KEY` | yes | — | Shared device secret sent as `X-Device-Key` |
+| `ATTENDYO_API_URL` | yes | — | Attendyo API base, e.g. `http://attendyo-api:8088` |
+| `ATTENDYO_DEVICE_KEY` | yes | — | Shared device secret sent as `X-Device-Key` |
 | `CAMERAS` | one of these | — | Inline JSON array of cameras (offline path) |
 | `CAMERAS_FILE` | for cameras | — | Path to a JSON file of cameras |
-| `LIWAN_OPERATOR_EMAIL` | for API discovery | — | Operator login to call `GET /api/cameras` |
-| `LIWAN_OPERATOR_PASSWORD` | for API discovery | — | Operator password |
+| `ATTENDYO_OPERATOR_EMAIL` | for API discovery | — | Operator login to call `GET /api/cameras` |
+| `ATTENDYO_OPERATOR_PASSWORD` | for API discovery | — | Operator password |
 | `BRIDGE_REQUEST_INTERVAL_S` | no | `1.5` | Min seconds between POSTs per camera |
 | `BRIDGE_DEBOUNCE_SECONDS` | no | `8.0` | Quiet window after a `granted` decision |
 | `BRIDGE_MOTION_MIN_AREA_FRAC` | no | `0.012` | Frame fraction that must change to "wake" |
@@ -75,7 +75,7 @@ decisioning (and usually a `door_id`):
 ]
 ```
 
-`camera_id` / `door_id` come from Liwan (Console → Doors/Cameras, or
+`camera_id` / `door_id` come from Attendyo (Console → Doors/Cameras, or
 `GET /api/cameras`). They let the API apply the right threshold, access group,
 and schedule. A `disabled` camera can be parked with `"enabled": false`.
 
@@ -88,15 +88,15 @@ export CAMERAS='[{"name":"Main","source":"rtsp://...","camera_id":"...","door_id
 …or from a file:
 
 ```bash
-export CAMERAS_FILE=/etc/liwan/cameras.json
+export CAMERAS_FILE=/etc/attendyo/cameras.json
 ```
 
 **2. From the API.** Leave `CAMERAS` / `CAMERAS_FILE` unset and instead provide
 operator credentials; the Bridge logs in and calls `GET /api/cameras`:
 
 ```bash
-export LIWAN_OPERATOR_EMAIL=admin@liwan.local
-export LIWAN_OPERATOR_PASSWORD=liwan-admin
+export ATTENDYO_OPERATOR_EMAIL=admin@attendyo.local
+export ATTENDYO_OPERATOR_PASSWORD=attendyo-admin
 ```
 
 (That endpoint is bearer-authed per the contract, so the device key alone is not
@@ -147,38 +147,38 @@ passed into the container (`--device /dev/video0`).
 
 ## Running
 
-### Docker Compose (with the rest of Liwan)
+### Docker Compose (with the rest of Attendyo)
 
 The Bridge is in `docker-compose.yml` under the `cameras` profile so it only
-starts when you ask for it. It already inherits `LIWAN_API_URL` and
-`LIWAN_DEVICE_KEY` from compose; add your camera discovery vars to `.env`:
+starts when you ask for it. It already inherits `ATTENDYO_API_URL` and
+`ATTENDYO_DEVICE_KEY` from compose; add your camera discovery vars to `.env`:
 
 ```bash
 # .env
-LIWAN_DEVICE_KEY=change-me-device-shared-secret
-CAMERAS_FILE=/etc/liwan/cameras.json   # or inline CAMERAS=...
+ATTENDYO_DEVICE_KEY=change-me-device-shared-secret
+CAMERAS_FILE=/etc/attendyo/cameras.json   # or inline CAMERAS=...
 ```
 
 Then:
 
 ```bash
-docker compose --profile cameras up -d liwan-bridge
-docker compose logs -f liwan-bridge
+docker compose --profile cameras up -d attendyo-bridge
+docker compose logs -f attendyo-bridge
 ```
 
-To use a USB camera, add a device mapping to the `liwan-bridge` service
+To use a USB camera, add a device mapping to the `attendyo-bridge` service
 (`devices: ["/dev/video0:/dev/video0"]`).
 
 ### Standalone container
 
 ```bash
-docker build -t liwan-bridge ./services/bridge
+docker build -t attendyo-bridge ./services/bridge
 
 docker run --rm \
-  -e LIWAN_API_URL=http://192.168.1.10:8088 \
-  -e LIWAN_DEVICE_KEY=change-me-device-shared-secret \
+  -e ATTENDYO_API_URL=http://192.168.1.10:8088 \
+  -e ATTENDYO_DEVICE_KEY=change-me-device-shared-secret \
   -e CAMERAS='[{"name":"Main","source":"rtsp://operator:Passw0rd@192.168.1.64:554/Streaming/Channels/102","camera_id":"...","door_id":"..."}]' \
-  liwan-bridge
+  attendyo-bridge
 ```
 
 ### Bare metal (dev)
@@ -188,8 +188,8 @@ cd services/bridge
 python -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt
 
-export LIWAN_API_URL=http://localhost:8088
-export LIWAN_DEVICE_KEY=change-me-device-shared-secret
+export ATTENDYO_API_URL=http://localhost:8088
+export ATTENDYO_DEVICE_KEY=change-me-device-shared-secret
 export CAMERAS='[{"name":"Webcam","source":"0","camera_id":"...","door_id":"..."}]'
 
 python -m src.bridge
@@ -200,7 +200,7 @@ python -m src.bridge
 ## Logs you'll see
 
 ```
-LIWAN Bridge starting | api=http://liwan-api:8088 cameras=2 interval=1.5s debounce=8.0s
+ATTENDYO Bridge starting | api=http://attendyo-api:8088 cameras=2 interval=1.5s debounce=8.0s
 started worker cam:Main Entrance
 cam:Main Entrance | stream connected
 cam:Main Entrance | decision=granted who=Amine Z. sim=0.931 dir=in door_opened=True
@@ -223,4 +223,4 @@ decided.
 - **Misses fast walkers** → lower `BRIDGE_MOTION_MIN_AREA_FRAC` and/or
   `BRIDGE_REQUEST_INTERVAL_S`.
 - **Recognition accuracy** (threshold, detection probability) is owned by the
-  API/camera settings, not the Bridge. Adjust those in Liwan.
+  API/camera settings, not the Bridge. Adjust those in Attendyo.

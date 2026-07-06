@@ -1,7 +1,7 @@
 /**
- * Typed Liwan API client (browser-side).
+ * Typed Attendyo API client (browser-side).
  *
- * Implements exactly the endpoints described in liwan/CONTRACT.md. Every call
+ * Implements exactly the endpoints described in attendyo/CONTRACT.md. Every call
  * carries the bearer token when present. When `NEXT_PUBLIC_MOCK=1` — or when the
  * real API is unreachable — it transparently serves the rich offline dataset in
  * lib/mock.ts so the Console renders fully without a backend.
@@ -86,7 +86,7 @@ import { hoursDecimal, todayISO } from "./utils";
 const API_URL =
   (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8088").replace(/\/$/, "");
 const FORCE_MOCK = process.env.NEXT_PUBLIC_MOCK === "1";
-const TOKEN_KEY = "liwan.token";
+const TOKEN_KEY = "attendyo.token";
 
 // --------------------------------------------------------------------------
 // Token storage (client only)
@@ -189,7 +189,7 @@ export async function login(email: string, password: string): Promise<LoginRespo
       }),
     async () => {
       await delay(350);
-      if (email.trim().toLowerCase() === "admin@liwan.local" && password === "liwan-admin") {
+      if (email.trim().toLowerCase() === "admin@attendyo.local" && password === "attendyo-admin") {
         return { access_token: "mock.demo.token", token_type: "bearer" };
       }
       throw new ApiError(401, "Invalid credentials");
@@ -202,7 +202,7 @@ export async function me(): Promise<AuthUser> {
     () => request<AuthUser>("/api/auth/me"),
     () => ({
       id: "00000000-0000-4000-8000-000000000000",
-      email: "admin@liwan.local",
+      email: "admin@attendyo.local",
       full_name: "Administrateur",
       role: "admin" as const,
     }),
@@ -902,7 +902,7 @@ export async function ackAllAlerts(): Promise<{ acknowledged: number }> {
  * Cross-component "alerts changed" signal so the TopBar bell refreshes after an
  * ack anywhere in the app (and after live alert arrivals).
  */
-export const ALERTS_CHANGED_EVENT = "liwan:alerts-changed";
+export const ALERTS_CHANGED_EVENT = "attendyo:alerts-changed";
 
 export function notifyAlertsChanged() {
   if (typeof window !== "undefined") {

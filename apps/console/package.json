@@ -1,8 +1,8 @@
 {
-  "name": "liwan-console",
+  "name": "attendyo-console",
   "version": "1.0.0",
   "private": true,
-  "description": "Liwan Console — on-prem face attendance & access-control admin dashboard.",
+  "description": "Attendyo Console — on-prem face attendance & access-control admin dashboard.",
   "scripts": {
     "dev": "next dev -p 3000",
     "build": "next build",

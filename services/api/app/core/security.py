@@ -24,7 +24,7 @@ from passlib.context import CryptContext
 from . import db
 from .config import get_settings
 
-logger = logging.getLogger("liwan.security")
+logger = logging.getLogger("attendyo.security")
 
 # bcrypt with a sane work factor; deprecated schemes auto-rejected.
 _pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -69,7 +69,7 @@ def create_access_token(subject: str, *, role: str, extra: dict[str, Any] | None
     }
     if extra:
         payload.update(extra)
-    return jwt.encode(payload, settings.liwan_jwt_secret, algorithm=settings.jwt_algorithm)
+    return jwt.encode(payload, settings.attendyo_jwt_secret, algorithm=settings.jwt_algorithm)
 
 
 def decode_token(token: str) -> dict[str, Any]:
@@ -78,7 +78,7 @@ def decode_token(token: str) -> dict[str, Any]:
     try:
         return jwt.decode(
             token,
-            settings.liwan_jwt_secret,
+            settings.attendyo_jwt_secret,
             algorithms=[settings.jwt_algorithm],
         )
     except JWTError as exc:
@@ -181,7 +181,7 @@ async def allow_operator_or_device(
     to read the customer's white-label branding to theme itself.
     """
     settings = get_settings()
-    if x_device_key and x_device_key == settings.liwan_device_key:
+    if x_device_key and x_device_key == settings.attendyo_device_key:
         return
     effective = token or token_q
     if effective:
@@ -224,10 +224,10 @@ async def require_device_key(
     """Authorize a device call on the recognition hot path.
 
     Cameras, the Bridge and the Gate kiosk authenticate with the shared
-    ``LIWAN_DEVICE_KEY`` rather than an operator JWT.
+    ``ATTENDYO_DEVICE_KEY`` rather than an operator JWT.
     """
     settings = get_settings()
-    expected = settings.liwan_device_key
+    expected = settings.attendyo_device_key
     # Reject when unset/placeholder to avoid an open recognition endpoint.
     if not x_device_key or x_device_key != expected:
         raise HTTPException(

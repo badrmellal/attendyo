@@ -1,6 +1,6 @@
 # Installation — on-prem, single box
 
-Liwan installs on **one machine on your LAN**. There is no cloud account, no licence
+Attendyo installs on **one machine on your LAN**. There is no cloud account, no licence
 server to phone home, and no internet dependency at runtime. This guide takes a clean
 server to a working system with a door kiosk.
 
@@ -31,7 +31,7 @@ server to a working system with a door kiosk.
 
 ## 2. CPU sizing guidance
 
-Liwan is CPU-only (the recognition core ships in a MobileNet build). Size by the number
+Attendyo is CPU-only (the recognition core ships in a MobileNet build). Size by the number
 of **doors / simultaneous recognitions** and the **enrolled population**, not by GPU.
 
 | Site profile                         | People enrolled | Doors | Recommended box                                  |
@@ -43,7 +43,7 @@ of **doors / simultaneous recognitions** and the **enrolled population**, not by
 Notes:
 
 - **Enrolled-face count is bounded by disk/RAM, not firmware.** Unlike hardware terminals
-  (e.g. ~3,000 faces/device), Liwan has no hard cap; the table above is comfort, not a
+  (e.g. ~3,000 faces/device), Attendyo has no hard cap; the table above is comfort, not a
   ceiling.
 - **Recognition latency is driven by CPU cores × core concurrency** (`uwsgi_processes`,
   `uwsgi_threads`), not by population size.
@@ -57,8 +57,8 @@ Notes:
 ## 3. Install
 
 ```bash
-# 0) Get the Liwan bundle onto the server (git clone, scp, or USB for air-gapped).
-cd liwan
+# 0) Get the Attendyo bundle onto the server (git clone, scp, or USB for air-gapped).
+cd attendyo
 
 # 1) Configure.
 cp .env.example .env
@@ -69,15 +69,15 @@ Edit `.env` and change **every** secret before the box touches a real network:
 | Variable               | Why it matters                                                     |
 |------------------------|--------------------------------------------------------------------|
 | `postgres_password`    | Database superuser. Never leave `change-me-in-production`.          |
-| `LIWAN_JWT_SECRET`     | Signs operator sessions. Use a long random string (32+ chars).     |
-| `LIWAN_ADMIN_PASSWORD` | First admin login. Change here and again in Console → Settings.     |
-| `LIWAN_DEVICE_KEY`     | Shared secret every Gate/Bridge presents as `X-Device-Key`.         |
+| `ATTENDYO_JWT_SECRET`     | Signs operator sessions. Use a long random string (32+ chars).     |
+| `ATTENDYO_ADMIN_PASSWORD` | First admin login. Change here and again in Console → Settings.     |
+| `ATTENDYO_DEVICE_KEY`     | Shared secret every Gate/Bridge presents as `X-Device-Key`.         |
 | `ENGINE_API_KEY`       | Filled in step 4 — `scripts/provision_engine.py` writes it for you. |
 
 Generate strong secrets, for example:
 
 ```bash
-openssl rand -hex 32      # good for LIWAN_JWT_SECRET / LIWAN_DEVICE_KEY
+openssl rand -hex 32      # good for ATTENDYO_JWT_SECRET / ATTENDYO_DEVICE_KEY
 ```
 
 ```bash
@@ -96,7 +96,7 @@ curl -s http://localhost:8088/health      # engine + DB status must be "ok"
 python scripts/provision_engine.py \
   --email admin@example.com --password 'a-strong-password' --write-env
 #    Then restart the API so it picks up the key:
-docker compose up -d liwan-api
+docker compose up -d attendyo-api
 ```
 
 ```text
@@ -105,7 +105,7 @@ docker compose up -d liwan-api
 http://<server-ip>:8000
 #    → create an application → add a service of type "Recognition"
 #    → copy the generated API key → paste it into .env as ENGINE_API_KEY
-#    → docker compose up -d liwan-api
+#    → docker compose up -d attendyo-api
 ```
 
 ```bash
@@ -114,14 +114,14 @@ http://<server-ip>:8000
 python scripts/seed_demo.py
 
 # 6) Verify the surfaces from another LAN machine:
-#      Console : http://<server-ip>:3000   (login admin@liwan.local / your password)
+#      Console : http://<server-ip>:3000   (login admin@attendyo.local / your password)
 #      Gate    : http://<server-ip>:3001   (point a wall tablet here)
 ```
 
 For fixed RTSP cameras (no tablet at the door), enable the Bridge:
 
 ```bash
-docker compose --profile cameras up -d liwan-bridge
+docker compose --profile cameras up -d attendyo-bridge
 ```
 
 ---
@@ -145,7 +145,7 @@ Expose only what each audience needs; keep the rest internal to the Docker netwo
 |------|------------------------|-------------------------------------------------------------------|
 | 3000 | operator workstations  | Console. Restrict to admin/HR subnet if possible.                 |
 | 3001 | door tablets           | Gate. Restrict to the door-tablet VLAN.                           |
-| 8088 | apps, tablets, Bridge  | Liwan API. LAN only.                                              |
+| 8088 | apps, tablets, Bridge  | Attendyo API. LAN only.                                              |
 | 8000 | installer, briefly     | Engine console. Close after setup, or restrict to admins.         |
 | 5432 | nobody                 | Postgres. **Keep internal** to the Docker network — do not publish.|
 
@@ -161,7 +161,7 @@ sudo ufw allow from 192.168.1.0/24 to any port 8000 proto tcp
 sudo ufw enable
 ```
 
-**No inbound rule from the internet is required or recommended.** Liwan is a LAN product.
+**No inbound rule from the internet is required or recommended.** Attendyo is a LAN product.
 If remote admin is genuinely needed, terminate it through a VPN into the LAN — never
 publish these ports to the public internet.
 
@@ -179,23 +179,23 @@ What to back up and how. All of it is local.
   engine's subjects/embeddings). A nightly dump:
 
   ```bash
-  docker exec liwan-postgres-db \
-    pg_dump -U postgres -d liwan -Fc > /backups/liwan-$(date +%F).dump
+  docker exec attendyo-postgres-db \
+    pg_dump -U postgres -d attendyo -Fc > /backups/attendyo-$(date +%F).dump
   ```
 
   Restore:
 
   ```bash
-  cat /backups/liwan-YYYY-MM-DD.dump | \
-    docker exec -i liwan-postgres-db pg_restore -U postgres -d liwan --clean --if-exists
+  cat /backups/attendyo-YYYY-MM-DD.dump | \
+    docker exec -i attendyo-postgres-db pg_restore -U postgres -d attendyo --clean --if-exists
   ```
 
 - **Media volume** — stored enrolment images and event snapshots live in the
-  `liwan-media` Docker volume (mounted at `/data/media` in the API). Back it up:
+  `attendyo-media` Docker volume (mounted at `/data/media` in the API). Back it up:
 
   ```bash
-  docker run --rm -v liwan-media:/data -v /backups:/backup alpine \
-    tar czf /backup/liwan-media-$(date +%F).tgz -C /data .
+  docker run --rm -v attendyo-media:/data -v /backups:/backup alpine \
+    tar czf /backup/attendyo-media-$(date +%F).tgz -C /data .
   ```
 
 - **`.env`** — keep a copy of your configured `.env` (with its secrets) in your secrets
@@ -214,7 +214,7 @@ For sites that must never touch the internet:
 
 1. On a machine **with** internet, pull every image referenced by `docker-compose.yml`
    and `docker save` them to a tarball.
-2. Transfer the tarball + the `liwan/` directory by approved media.
+2. Transfer the tarball + the `attendyo/` directory by approved media.
 3. `docker load` the images on the target box, then run the steps in §3 (skip the pull).
 
 After that, the system runs indefinitely offline. There is no licence call-home and no
@@ -226,7 +226,7 @@ telemetry.
 
 - Pin the vision-engine versions in `.env` (`*_VERSION`) so upgrades are deliberate.
 - Before upgrading: back up Postgres and the media volume (§6).
-- Pull the new Liwan bundle / images, then `docker compose up -d` to roll forward.
+- Pull the new Attendyo bundle / images, then `docker compose up -d` to roll forward.
 - The schema is idempotent (`CREATE TABLE IF NOT EXISTS …`, seeds use `ON CONFLICT DO
   NOTHING`), so re-applying `db/schema.sql` is safe.
 
@@ -242,4 +242,4 @@ telemetry.
 | Gate can't open camera                    | Browser camera permission; HTTPS may be required by the browser for webcam — use the LAN TLS proxy (§5). |
 | Door never actuates on `granted`          | Driver config; use the door **test pulse**; see [`DOOR-INTEGRATION.md`](DOOR-INTEGRATION.md). |
 
-Logs: `docker compose logs -f liwan-api` (and `liwan-engine-core` for recognition).
+Logs: `docker compose logs -f attendyo-api` (and `attendyo-engine-core` for recognition).

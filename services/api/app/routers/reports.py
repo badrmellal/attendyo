@@ -37,7 +37,7 @@ from ..models.schemas import (
     ReportSummary,
 )
 
-logger = logging.getLogger("liwan.reports")
+logger = logging.getLogger("attendyo.reports")
 
 router = APIRouter(prefix="/api/reports", tags=["reports"])
 

@@ -1,5 +1,5 @@
 """
-LIWAN Bridge — per-camera recognition loop.
+ATTENDYO Bridge — per-camera recognition loop.
 
 For each fixed camera the bridge:
 
@@ -23,7 +23,7 @@ Cameras run on independent daemon threads; the main thread waits for a stop
 signal and shuts everything down cleanly.
 
 The bridge never decides access itself and never talks to the vision engine or the
-door directly — it is purely an eye that feeds the Liwan API. That keeps the
+door directly — it is purely an eye that feeds the Attendyo API. That keeps the
 decision rules in exactly one place (the API), per CONTRACT.md.
 """
 
@@ -44,7 +44,7 @@ import requests
 from . import config
 from .config import BridgeConfig, CameraConfig, ConfigError
 
-log = logging.getLogger("liwan.bridge")
+log = logging.getLogger("attendyo.bridge")
 
 # Short quiet window after a non-grant decision (unknown_face / not_authorized /
 # off_schedule / error). Keeps us from hammering the API on a stranger loitering
@@ -145,7 +145,7 @@ class CameraWorker(threading.Thread):
         self._debounce = _Debounce()
         # One pooled session per camera (keep-alive to the API).
         self._session = requests.Session()
-        self._log = logging.getLogger(f"liwan.bridge.{cam.name}")
+        self._log = logging.getLogger(f"attendyo.bridge.{cam.name}")
 
     # -- capture lifecycle --------------------------------------------------
     def _open_capture(self) -> Optional[cv2.VideoCapture]:
@@ -269,7 +269,7 @@ class CameraWorker(threading.Thread):
             return None
 
         if resp.status_code == 401 or resp.status_code == 403:
-            self._log.error("recognize rejected (%s): check LIWAN_DEVICE_KEY",
+            self._log.error("recognize rejected (%s): check ATTENDYO_DEVICE_KEY",
                             resp.status_code)
             return None
         if resp.status_code >= 400:
@@ -331,7 +331,7 @@ def main() -> int:
         return 2
 
     _setup_logging(cfg.log_level)
-    log.info("LIWAN Bridge starting | api=%s cameras=%d interval=%.1fs debounce=%.1fs",
+    log.info("ATTENDYO Bridge starting | api=%s cameras=%d interval=%.1fs debounce=%.1fs",
              cfg.api_url, len(cfg.cameras), cfg.request_interval_s,
              cfg.debounce_seconds)
 

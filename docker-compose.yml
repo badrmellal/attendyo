@@ -1,48 +1,48 @@
 # ===========================================================================
-# LIWAN — Face Attendance & Access Control
-# Full on-prem stack: Liwan Vision Engine + Liwan app. Runs on a single CPU box.
+# ATTENDYO — Face Attendance & Access Control
+# Full on-prem stack: Attendyo Vision Engine + Attendyo app. Runs on a single CPU box.
 #   docker compose up -d
 # Ports:
 #   8000  Vision engine console (enrolment fallback / engine config)
-#   8088  Liwan API (FastAPI)
-#   3000  Liwan Console (admin dashboard)
-#   3001  Liwan Gate (door kiosk)
+#   8088  Attendyo API (FastAPI)
+#   3000  Attendyo Console (admin dashboard)
+#   3001  Attendyo Gate (door kiosk)
 # ===========================================================================
 
 volumes:
-  liwan-postgres-data:
-  liwan-media:
+  attendyo-postgres-data:
+  attendyo-media:
 
 networks:
-  liwan:
+  attendyo:
 
 services:
-  # ---- Liwan Vision Engine (recognition core) -------------------------------
+  # ---- Attendyo Vision Engine (recognition core) -------------------------------
   # Image values point at the upstream registry that ships the engine runtime
   # images (implementation detail; see NOTICE for third-party attribution).
-  liwan-postgres-db:
+  attendyo-postgres-db:
     image: ${registry}compreface-postgres-db:${POSTGRES_VERSION}
-    container_name: liwan-postgres-db
+    container_name: attendyo-postgres-db
     restart: always
     environment:
       - POSTGRES_USER=${postgres_username}
       - POSTGRES_PASSWORD=${postgres_password}
       - POSTGRES_DB=${postgres_db}
     volumes:
-      - liwan-postgres-data:/var/lib/postgresql/data
-      - ./db/schema.sql:/docker-entrypoint-initdb.d/10-liwan-schema.sql:ro
+      - attendyo-postgres-data:/var/lib/postgresql/data
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/10-attendyo-schema.sql:ro
     # Deliberately NOT published to the host: 5432 is a common local-Postgres
-    # port and the recommended seeding path (`docker compose exec liwan-api
+    # port and the recommended seeding path (`docker compose exec attendyo-api
     # python scripts/seed_demo.py`) never needs it. Add your own `ports:`
     # mapping to a free host port if you want a host-side DB client.
-    networks: [liwan]
+    networks: [attendyo]
 
-  liwan-engine-admin:
-    # Liwan Vision Engine runtime image (management service).
+  attendyo-engine-admin:
+    # Attendyo Vision Engine runtime image (management service).
     image: ${registry}compreface-admin:${ADMIN_VERSION}
-    container_name: liwan-engine-admin
+    container_name: attendyo-engine-admin
     restart: always
-    depends_on: [liwan-postgres-db, liwan-engine-api]
+    depends_on: [attendyo-postgres-db, attendyo-engine-api]
     environment:
       - POSTGRES_USER=${postgres_username}
       - POSTGRES_PASSWORD=${postgres_password}
@@ -53,19 +53,19 @@ services:
       - MAX_FILE_SIZE=${max_file_size}
       - MAX_REQUEST_SIZE=${max_request_size}B
     networks:
-      liwan:
-        # The vision-engine UI image (liwan-engine-ui) ships an nginx config
+      attendyo:
+        # The vision-engine UI image (attendyo-engine-ui) ships an nginx config
         # with the upstream hostname `compreface-admin` baked in from the
         # upstream project. This alias satisfies that lookup without
         # un-white-labeling the container's own name.
         aliases: [compreface-admin]
 
-  liwan-engine-api:
-    # Liwan Vision Engine runtime image (recognition REST API).
+  attendyo-engine-api:
+    # Attendyo Vision Engine runtime image (recognition REST API).
     image: ${registry}compreface-api:${API_VERSION}
-    container_name: liwan-engine-api
+    container_name: attendyo-engine-api
     restart: always
-    depends_on: [liwan-postgres-db]
+    depends_on: [attendyo-postgres-db]
     environment:
       - POSTGRES_USER=${postgres_username}
       - POSTGRES_PASSWORD=${postgres_password}
@@ -78,14 +78,14 @@ services:
       - CONNECTION_TIMEOUT=${connection_timeout:-10000}
       - READ_TIMEOUT=${read_timeout:-60000}
     networks:
-      liwan:
-        # Same reasoning as liwan-engine-admin above.
+      attendyo:
+        # Same reasoning as attendyo-engine-admin above.
         aliases: [compreface-api]
 
-  liwan-engine-core:
-    # Liwan Vision Engine runtime image (ML inference, CPU-only).
+  attendyo-engine-core:
+    # Attendyo Vision Engine runtime image (ML inference, CPU-only).
     image: ${registry}compreface-core:${CORE_VERSION}
-    container_name: liwan-engine-core
+    container_name: attendyo-engine-core
     restart: always
     environment:
       - ML_PORT=3000
@@ -94,34 +94,34 @@ services:
       - UWSGI_THREADS=${uwsgi_threads:-2}
       - PYTHONUNBUFFERED=1
     networks:
-      liwan:
-        # Same reasoning as liwan-engine-admin above.
+      attendyo:
+        # Same reasoning as attendyo-engine-admin above.
         aliases: [compreface-core]
 
-  liwan-engine-ui:
-    # Liwan Vision Engine runtime image (engine console at :8000).
+  attendyo-engine-ui:
+    # Attendyo Vision Engine runtime image (engine console at :8000).
     image: ${registry}compreface-fe:${FE_VERSION}
-    container_name: liwan-engine-ui
+    container_name: attendyo-engine-ui
     restart: always
-    depends_on: [liwan-engine-api, liwan-engine-admin]
+    depends_on: [attendyo-engine-api, attendyo-engine-admin]
     ports:
       - "8000:80"
     environment:
       - CLIENT_MAX_BODY_SIZE=${max_request_size}
       - PROXY_READ_TIMEOUT=${read_timeout:-60000}ms
       - PROXY_CONNECT_TIMEOUT=${connection_timeout:-10000}ms
-    networks: [liwan]
+    networks: [attendyo]
 
-  # ---- Liwan application layer --------------------------------------------
-  liwan-api:
+  # ---- Attendyo application layer --------------------------------------------
+  attendyo-api:
     build:
       # Repo root context so the image bundles db/ (schema + migrations) for
       # self-healing startup migrations.
       context: .
       dockerfile: services/api/Dockerfile
-    container_name: liwan-api
+    container_name: attendyo-api
     restart: unless-stopped
-    depends_on: [liwan-postgres-db, liwan-engine-api]
+    depends_on: [attendyo-postgres-db, attendyo-engine-api]
     environment:
       - DB_HOST=${postgres_domain}
       - DB_PORT=${postgres_port}
@@ -130,51 +130,51 @@ services:
       - DB_PASSWORD=${postgres_password}
       # Vision-engine connection (the API itself also accepts legacy variable
       # names from an older .env, so upgrades need no compose edits).
-      - ENGINE_URL=${ENGINE_URL:-http://liwan-engine-api:8080}
+      - ENGINE_URL=${ENGINE_URL:-http://attendyo-engine-api:8080}
       - ENGINE_API_KEY=${ENGINE_API_KEY:-}
-      - LIWAN_JWT_SECRET=${LIWAN_JWT_SECRET}
-      - LIWAN_ADMIN_EMAIL=${LIWAN_ADMIN_EMAIL}
-      - LIWAN_ADMIN_PASSWORD=${LIWAN_ADMIN_PASSWORD}
-      - LIWAN_DEVICE_KEY=${LIWAN_DEVICE_KEY}
+      - ATTENDYO_JWT_SECRET=${ATTENDYO_JWT_SECRET}
+      - ATTENDYO_ADMIN_EMAIL=${ATTENDYO_ADMIN_EMAIL}
+      - ATTENDYO_ADMIN_PASSWORD=${ATTENDYO_ADMIN_PASSWORD}
+      - ATTENDYO_DEVICE_KEY=${ATTENDYO_DEVICE_KEY}
     volumes:
-      - liwan-media:/data/media
+      - attendyo-media:/data/media
     ports:
       - "8088:8088"
-    networks: [liwan]
+    networks: [attendyo]
 
-  liwan-console:
+  attendyo-console:
     build:
       context: ./apps/console
       args:
         - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
-    container_name: liwan-console
+    container_name: attendyo-console
     restart: unless-stopped
-    depends_on: [liwan-api]
+    depends_on: [attendyo-api]
     ports:
       - "3000:3000"
-    networks: [liwan]
+    networks: [attendyo]
 
-  liwan-gate:
+  attendyo-gate:
     build:
       context: ./apps/gate
       args:
         - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
-    container_name: liwan-gate
+    container_name: attendyo-gate
     restart: unless-stopped
-    depends_on: [liwan-api]
+    depends_on: [attendyo-api]
     ports:
       - "3001:3000"
-    networks: [liwan]
+    networks: [attendyo]
 
   # ---- Bridge: camera → recognition → door (optional; for fixed RTSP cams) -
   # Enable with: docker compose --profile cameras up -d
-  liwan-bridge:
+  attendyo-bridge:
     build: ./services/bridge
-    container_name: liwan-bridge
+    container_name: attendyo-bridge
     restart: unless-stopped
     profiles: ["cameras"]
-    depends_on: [liwan-api]
+    depends_on: [attendyo-api]
     environment:
-      - LIWAN_API_URL=http://liwan-api:8088
-      - LIWAN_DEVICE_KEY=${LIWAN_DEVICE_KEY}
-    networks: [liwan]
+      - ATTENDYO_API_URL=http://attendyo-api:8088
+      - ATTENDYO_DEVICE_KEY=${ATTENDYO_DEVICE_KEY}
+    networks: [attendyo]
