@@ -37,7 +37,7 @@ const CAPTURE_MAX_WIDTH = 640;
 const CAPTURE_QUALITY = 0.82;
 
 /**
- * The Attendyo signature: the live camera sits *inside the Check Gate doorway*.
+ * The Attendyo signature: the live camera sits *inside the doorway frame*.
  * The video is clipped to the doorway silhouette and a thick gate frame is stroked
  * over it — gold at idle (with a soft gold sweep tracing the outline), glowing
  * ultramarine when access is granted, flushing rose once when denied. The doorway
@@ -49,7 +49,7 @@ const CAPTURE_QUALITY = 0.82;
 // Shared doorway path in a 0..100 (x) by 0..133.33 (y) space — a 3:4 viewport.
 // A gentle rounded doorway: straight jambs rising well past mid-height, then a
 // single shallow, continuous arc into a flat-ish crown — NOT a horseshoe/pointed
-// Moroccan arch. Matches the "Check Gate" mark's silhouette (see brand/BRAND.md),
+// Moroccan arch. A gentle doorway silhouette (see brand/BRAND.md),
 // just widened to fill this 3:4 kiosk viewport.
 const ARCH_VB_W = 100;
 const ARCH_VB_H = 133.333;

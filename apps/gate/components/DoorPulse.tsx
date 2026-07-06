@@ -10,7 +10,7 @@ interface DoorPulseProps {
 
 /**
  * The signature door-open moment: two ultramarine rings expand outward from the
- * keystone — the top centre of the Check Gate doorway where the face appears —
+ * keystone — the top centre of the doorway frame where the face appears —
  * with a soft radial glow. Mounted only on GRANTED, unmounted on idle so the
  * keyframes restart cleanly every time. Purely decorative (aria-hidden).
  *

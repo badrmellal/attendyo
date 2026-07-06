@@ -1,55 +1,74 @@
 "use client";
 
 /**
- * BrandLogo — the Check Gate mark + wordmark.
+ * BrandLogo — the Aperture Tile mark + wordmark.
  *
- * The glyph is inline SVG so it recolors from the live `--primary` token (set by
- * BrandingProvider). The wordmark text is the branding `product_name`, never a
- * hard-coded "Attendyo". If the operator configures a `logo_url`, we show that
- * image instead — this is the white-label escape hatch.
+ * The mark is an app-icon-grade rounded tile: an ultramarine→violet gradient
+ * (from the live `--primary` / `--primary-2` tokens), a portal opening reversed
+ * out in white, and a gold "recognised" spark (`--accent`). Because it reads
+ * those CSS tokens it recolors for white-label customers. The wordmark is the
+ * branding `product_name`, never a hard-coded "Attendyo". If the operator
+ * configures a `logo_url`, we show that image instead — the white-label escape
+ * hatch. This path is shared verbatim with the Gate app + both favicons so the
+ * mark is pixel-identical everywhere.
  */
 
+import { useId } from "react";
 import { useBranding } from "./BrandingProvider";
 import { cn } from "@/lib/utils";
 
 type Props = {
-  /** Show the wordmark beside the glyph. */
+  /** Show the wordmark beside the mark. */
   withWordmark?: boolean;
   size?: number;
   className?: string;
 };
 
 export function BrandMark({ size = 28, className }: { size?: number; className?: string }) {
-  // The Check Gate — a soft rounded doorway with a checkmark resolving at its
-  // heart. Inline SVG so it recolors from the live --primary / --accent tokens
-  // (set by BrandingProvider). This exact path is shared verbatim with the
-  // Gate app's favicon so the mark is pixel-identical everywhere.
-  const height = Math.round((size * 28) / 24);
+  // Unique gradient ids per instance so multiple marks on one page never clash.
+  const uid = useId().replace(/:/g, "");
+  const gid = `am-${uid}`;
+  const hid = `amh-${uid}`;
   return (
     <svg
       width={size}
-      height={height}
-      viewBox="0 0 24 28"
+      height={size}
+      viewBox="0 0 52 52"
       fill="none"
       role="img"
       aria-hidden="true"
-      className={cn("text-primary", className)}
+      className={className}
     >
-      {/* The gate: a soft rounded doorway, not a horseshoe arch */}
+      <defs>
+        <linearGradient id={gid} x1="0" y1="0" x2="52" y2="52" gradientUnits="userSpaceOnUse">
+          <stop stopColor="rgb(var(--primary))" />
+          <stop offset="1" stopColor="rgb(var(--primary-2))" />
+        </linearGradient>
+        <linearGradient id={hid} x1="26" y1="0" x2="26" y2="30" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#fff" stopOpacity="0.22" />
+          <stop offset="1" stopColor="#fff" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      {/* Gradient tile + a soft top highlight for depth. */}
+      <rect width="52" height="52" rx="14" fill={`url(#${gid})`} />
+      <rect width="52" height="52" rx="14" fill={`url(#${hid})`} />
+      {/* The portal opening, reversed out in white. */}
       <path
-        d="M4 26 V11 C4 6.6 7.6 3 12 3 C16.4 3 20 6.6 20 11 V26"
-        stroke="currentColor"
-        strokeWidth="2"
+        d="M16 40 V24 C16 16.8 20.5 12 26 12 C31.5 12 36 16.8 36 24 V40"
+        stroke="#fff"
+        strokeWidth="3.1"
         strokeLinecap="round"
+        opacity="0.96"
       />
-      {/* The check: resolving inside it */}
       <path
-        d="M8.3 15.6 L11 18.4 L16.2 12.4"
-        stroke="rgb(var(--accent))"
-        strokeWidth="2.3"
+        d="M22 40 V26 C22 22 23.8 20 26 20 C28.2 20 30 22 30 26 V40"
+        stroke="#fff"
+        strokeWidth="2.4"
         strokeLinecap="round"
-        strokeLinejoin="round"
+        opacity="0.5"
       />
+      {/* The gold "recognised" spark. */}
+      <circle cx="26" cy="22.5" r="2.7" fill="rgb(var(--accent))" />
     </svg>
   );
 }
@@ -75,7 +94,7 @@ export function BrandLogo({ withWordmark = true, size = 28, className }: Props) 
       {withWordmark && !branding.logo_url && (
         <span
           className="font-display font-semibold tracking-tight text-text"
-          style={{ fontSize: size * 0.62 }}
+          style={{ fontSize: size * 0.68 }}
         >
           {branding.product_name}
         </span>

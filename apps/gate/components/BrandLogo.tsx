@@ -1,5 +1,6 @@
 "use client";
 
+import { useId } from "react";
 import Image from "next/image";
 import type { Branding } from "@/lib/types";
 import { cn } from "@/lib/cn";
@@ -7,21 +8,64 @@ import { cn } from "@/lib/cn";
 interface BrandLogoProps {
   branding: Branding;
   className?: string;
-  /** Wordmark glyph height in px. */
+  /** Mark size in px (the tile is square). */
   size?: number;
 }
 
 /**
- * Brand wordmark for the kiosk.
+ * The Aperture Tile mark, used on the kiosk.
  *
- * If branding.logo_url is set we render that (white-label customer logo).
- * Otherwise we draw the Check Gate glyph — a minimal rounded doorway with a
- * checkmark resolving at its centre — recoloured from the ultramarine
- * `--primary` token, plus the product_name wordmark set in the Fraunces
- * display serif. Never hard-codes "Attendyo": the text comes from
- * branding.product_name. Path is verbatim from brand/BRAND.md so the mark is
- * pixel-identical to the Console and the favicon.
+ * An app-icon-grade rounded tile: an ultramarine→violet gradient (from the live
+ * `--primary` / `--primary-2` tokens), a portal opening reversed out in white,
+ * and a gold "recognised" spark (`--accent`) — so it recolors for white-label
+ * customers. Pixel-identical to the Console mark and both favicons. If
+ * branding.logo_url is set we render that instead (white-label escape hatch).
  */
+export function ApertureMark({ size = 30, className }: { size?: number; className?: string }) {
+  const uid = useId().replace(/:/g, "");
+  const gid = `am-${uid}`;
+  const hid = `amh-${uid}`;
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 52 52"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className={className}
+      aria-hidden="true"
+    >
+      <defs>
+        <linearGradient id={gid} x1="0" y1="0" x2="52" y2="52" gradientUnits="userSpaceOnUse">
+          <stop stopColor="rgb(var(--primary))" />
+          <stop offset="1" stopColor="rgb(var(--primary-2))" />
+        </linearGradient>
+        <linearGradient id={hid} x1="26" y1="0" x2="26" y2="30" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#fff" stopOpacity="0.22" />
+          <stop offset="1" stopColor="#fff" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <rect width="52" height="52" rx="14" fill={`url(#${gid})`} />
+      <rect width="52" height="52" rx="14" fill={`url(#${hid})`} />
+      <path
+        d="M16 40 V24 C16 16.8 20.5 12 26 12 C31.5 12 36 16.8 36 24 V40"
+        stroke="#fff"
+        strokeWidth="3.1"
+        strokeLinecap="round"
+        opacity="0.96"
+      />
+      <path
+        d="M22 40 V26 C22 22 23.8 20 26 20 C28.2 20 30 22 30 26 V40"
+        stroke="#fff"
+        strokeWidth="2.4"
+        strokeLinecap="round"
+        opacity="0.5"
+      />
+      <circle cx="26" cy="22.5" r="2.7" fill="rgb(var(--accent))" />
+    </svg>
+  );
+}
+
 export function BrandLogo({ branding, className, size = 30 }: BrandLogoProps) {
   if (branding.logo_url) {
     return (
@@ -39,44 +83,11 @@ export function BrandLogo({ branding, className, size = 30 }: BrandLogoProps) {
   }
 
   return (
-    <div
-      className={cn("flex items-center gap-3", className)}
-      aria-label={branding.product_name}
-    >
-      {/* The Check Gate: a soft rounded doorway with a checkmark resolving inside
-          it. Strokes use --primary; verbatim path from brand/BRAND.md. */}
-      <svg
-        width={(size * 24) / 28}
-        height={size}
-        viewBox="0 0 24 28"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-        className="text-primary"
-        aria-hidden="true"
-      >
-        {/* The gate: a soft rounded doorway, not a horseshoe arch */}
-        <path
-          d="M4 26 V11 C4 6.6 7.6 3 12 3 C16.4 3 20 6.6 20 11 V26"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-        />
-        {/* The check: resolving inside it */}
-        <path
-          d="M8.3 15.6 L11 18.4 L16.2 12.4"
-          stroke="currentColor"
-          strokeWidth="2.3"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
+    <div className={cn("flex items-center gap-3", className)} aria-label={branding.product_name}>
+      <ApertureMark size={size} />
       <span
         className="font-display text-text"
-        style={{
-          fontSize: size * 0.74,
-          fontWeight: 600,
-          letterSpacing: "-0.01em",
-        }}
+        style={{ fontSize: size * 0.74, fontWeight: 600, letterSpacing: "-0.01em" }}
       >
         {branding.product_name}
       </span>

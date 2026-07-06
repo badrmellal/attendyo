@@ -39,21 +39,35 @@ export default function LoginPage() {
   return (
     <div className="app-aura min-h-screen lg:grid lg:grid-cols-2">
       {/* Brand narrative panel */}
-      <aside className="relative hidden flex-col justify-between overflow-hidden border-r border-border bg-surface/40 p-12 lg:flex">
-        <div
-          className="pointer-events-none absolute -left-24 -top-24 h-96 w-96 rounded-full blur-3xl"
-          style={{ background: "rgb(var(--primary) / 0.12)" }}
-          aria-hidden
+      <aside className="relative hidden flex-col justify-between overflow-hidden border-r border-border p-12 lg:flex">
+        {/* Photographic backdrop — bundled locally in /public, never hotlinked,
+            so the app keeps zero external dependencies (the on-prem promise). */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/login-bg.jpg"
+          alt=""
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 h-full w-full object-cover"
         />
-        <div className="relative flex items-center gap-3">
-          <BrandMark size={36} />
+        {/* Brand wash: ties the photo into the palette and keeps text legible. */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background:
+              "linear-gradient(150deg, rgb(var(--bg) / 0.88) 0%, rgb(var(--primary) / 0.42) 55%, rgb(var(--bg) / 0.97) 100%)",
+          }}
+        />
+
+        <div className="relative z-10 flex items-center gap-3">
+          <BrandMark size={40} />
           <span className="font-display text-2xl font-semibold tracking-tight text-text">
             {branding.product_name}
           </span>
         </div>
 
-        <div className="relative max-w-md">
-          <h2 className="font-display text-3xl font-semibold leading-tight tracking-tight text-text">
+        <div className="relative z-10 max-w-md">
+          <h2 className="font-display text-[2.6rem] font-semibold leading-[1.05] tracking-tight text-text">
             {branding.tagline}
           </h2>
           <ul className="mt-8 space-y-4">
@@ -62,8 +76,8 @@ export default function LoginPage() {
               "La porte s'ouvre quand elle la reconnaît.",
               "Chaque entrée et sortie est enregistrée pour la journée.",
             ].map((line) => (
-              <li key={line} className="flex items-start gap-3 text-text-muted">
-                <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
+              <li key={line} className="flex items-start gap-3 text-text/85">
+                <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/25 text-primary ring-1 ring-primary/30">
                   <ShieldCheck className="h-3 w-3" />
                 </span>
                 <span className="text-sm">{line}</span>
@@ -72,7 +86,7 @@ export default function LoginPage() {
           </ul>
         </div>
 
-        <p className="relative text-xs text-text-muted">
+        <p className="relative z-10 text-xs text-text-muted">
           Sur site · sans cloud · sans abonnement · sans badge à perdre.
         </p>
       </aside>

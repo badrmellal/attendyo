@@ -20,9 +20,9 @@ Most access/HR dashboards look the same: Inter, cold slate, an emerald or indigo
 lucide icons in a card grid. Attendyo deliberately departs from that:
 1. **An architectural serif wordmark** (Fraunces) — editorial, confident, premium. No
    geometric-sans sameness.
-2. **The Check Gate mark** is the through-line — a minimal doorway with a checkmark at
-   its heart, echoed in the logo, the kiosk viewport the face appears inside, section
-   markers, and empty states.
+2. **The Aperture Tile mark** is the through-line — a gradient tile with a portal opening
+   and a gold "recognised" spark, echoed in the kiosk viewport the face appears inside,
+   section markers, and empty states.
 3. **A "riad at night" palette** — a warm violet-ink field, **ultramarine/Majorelle**
    as the primary, and **sand/ochre gold** as the accent. Distinctive and warm — the
    opposite of the stock emerald-on-slate look, and a quiet nod to the product's home
@@ -96,40 +96,47 @@ Notes when applying:
   `rgb(var(--primary)/0.10)` and `rgb(var(--accent)/0.06)`.
 - "Granted / present" → `--primary`. "Late" → `--accent`. "Denied / absent" → `--danger`.
 
-## The Check Gate (logo + motif)
+## The Aperture Tile (logo + motif)
 
-A minimal rounded doorway with a confident checkmark resolving at its center — you pass
-through, you're confirmed. Deliberately NOT a literal regional-architecture illustration
-(that was the old Attendyo mark, built as a pun on that name); this is a universal, modern
-mark that reads instantly at 16px and scales to a hero without looking twee.
+An **app-icon-grade rounded tile**: an ultramarine→violet gradient, a portal opening
+reversed out in white, and a gold "recognised" spark at its apex — the mark of a finished
+product, legible at 16px and premium at hero scale. Deliberately NOT a literal
+regional-architecture illustration (that was an earlier mark, built as a pun on a former
+name); this is universal and modern.
 
-Inline SVG so it recolors from tokens. Use this exact path as `BrandLogo`'s glyph and the
-favicon in **both** apps (Console + Gate) so the mark is pixel-identical everywhere:
+Inline SVG so it recolors from tokens: the tile gradient reads `--primary` → `--primary-2`,
+the spark reads `--accent`, the portal stays white for contrast on any brand colour. Use
+this exact geometry as `BrandMark` / `ApertureMark` in **both** apps (Console + Gate) and
+the favicon, so the mark is pixel-identical everywhere. Give the gradient a **unique id
+per instance** (React `useId`) to avoid `<defs>` collisions when several marks share a page:
 ```svg
-<svg viewBox="0 0 24 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <!-- The gate: a soft rounded doorway, not a horseshoe arch -->
-  <path d="M4 26 V11 C4 6.6 7.6 3 12 3 C16.4 3 20 6.6 20 11 V26"
-        stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-  <!-- The check: resolving inside it -->
-  <path d="M8.3 15.6 L11 18.4 L16.2 12.4"
-        stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>
+<svg viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="52" y2="52" gradientUnits="userSpaceOnUse">
+      <stop stop-color="rgb(var(--primary))"/><stop offset="1" stop-color="rgb(var(--primary-2))"/>
+    </linearGradient>
+    <linearGradient id="h" x1="26" y1="0" x2="26" y2="30" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fff" stop-opacity=".22"/><stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="52" height="52" rx="14" fill="url(#g)"/>            <!-- gradient tile -->
+  <rect width="52" height="52" rx="14" fill="url(#h)"/>            <!-- top highlight for depth -->
+  <path d="M16 40 V24 C16 16.8 20.5 12 26 12 C31.5 12 36 16.8 36 24 V40" stroke="#fff" stroke-width="3.1" stroke-linecap="round" opacity=".96"/>
+  <path d="M22 40 V26 C22 22 23.8 20 26 20 C28.2 20 30 22 30 26 V40" stroke="#fff" stroke-width="2.4" stroke-linecap="round" opacity=".5"/>
+  <circle cx="26" cy="22.5" r="2.7" fill="rgb(var(--accent))"/>   <!-- the "recognised" spark -->
 </svg>
 ```
-`BrandLogo` = this glyph (colored `text-primary`) + the wordmark in **Fraunces**
-(`font-display`), reading `branding.product_name` (default "Attendyo"), tracked
-`tracking-tight`. The checkmark stroke may use `text-accent` instead of inheriting
-`currentColor` for a two-tone treatment if it reads cleanly at small sizes — designer's
-call, but keep both apps consistent with each other.
+`BrandLogo` = this tile + the wordmark in **Fraunces** (`font-display`), reading
+`branding.product_name` (default "Attendyo"), tracked `tracking-tight`. The favicon uses
+the same geometry with literal hex (a favicon file has no CSS-var context): tile
+`#6470FF`→`#7C5CFF`, portal `#fff`, spark `#E0A340`.
 
 ### Gate kiosk signature
-The live camera sits **inside the gate outline** (mask the video with the doorway
-silhouette from the path above, scaled to fill the viewport — drop the checkmark at this
-scale, it's a small-glyph-only detail). Idle: the gate outline traced in **gold**.
-Scanning: a soft gold sweep along the outline. **Granted:** the gate + name glow
-**ultramarine**, the door-open pulse expands from the top-center (where the checkmark
-would sit), "Bienvenue {name}". **Denied:** the gate flushes **rose** once, calmly. This
-signature moment carries over unchanged in spirit from the previous mark — only the
-outline geometry changes (gentle doorway curve, not a horseshoe arch).
+The kiosk frames the live camera **inside a doorway silhouette** — its own element,
+independent of the app logo tile (the visitor literally appears within a portal). Idle:
+the outline traced in **gold**. Scanning: a soft gold sweep along the outline.
+**Granted:** the outline + name glow **ultramarine**, the door-open pulse expands from the
+top-center, "Bienvenue {name}". **Denied:** it flushes **rose** once, calmly.
 
 ## Surfaces
 - **Console** (`apps/console`, :3000): admin dashboard — login, today overview, people +

@@ -18,7 +18,7 @@ Sold once. Owned forever. Runs on your own LAN — no cloud, no subscription, no
 
 <br>
 
-<img src="docs/screenshots/gate-idle.png" alt="Attendyo Gate — the live camera framed inside the Check Gate mark, 'Regardez la caméra'" width="760">
+<img src="docs/screenshots/gate-idle.png" alt="Attendyo Gate — the live camera framed inside a doorway, 'Regardez la caméra'" width="760">
 
 <sub>The Gate kiosk at rest — a face appears inside the frame; the door opens when Attendyo knows them.</sub>
 
@@ -84,12 +84,22 @@ for `workforce`, `campus`, and `residence` — relabel, don't re-code.
 <table>
   <tr>
     <td width="50%" valign="top">
+      <img src="docs/screenshots/login.png" alt="Console sign-in — split screen with brand panel and form">
+      <sub><b>Console — sign in.</b> On-prem operator console; no cloud round-trip.</sub>
+    </td>
+    <td width="50%" valign="top">
       <img src="docs/screenshots/gate-welcome.png" alt="Gate kiosk — access granted, greeting a member by name">
       <sub><b>Gate — access granted.</b> Recognises the face, greets by name, logs the entry, opens the door.</sub>
     </td>
-    <td width="50%" valign="top">
+  </tr>
+  <tr>
+    <td valign="top">
       <img src="docs/screenshots/dashboard.png" alt="Console dashboard — today's presence overview">
       <sub><b>Console — today.</b> Present / late / absent / on-site, hourly arrivals, and a live access feed.</sub>
+    </td>
+    <td valign="top">
+      <img src="docs/screenshots/reports.png" alt="Reports — punctuality rate, daily presence chart, per-department analytics">
+      <sub><b>Reports.</b> Punctuality, daily presence trend, per-department analytics — CSV + print-ready report.</sub>
     </td>
   </tr>
   <tr>
@@ -104,23 +114,20 @@ for `workforce`, `campus`, and `residence` — relabel, don't re-code.
   </tr>
   <tr>
     <td valign="top">
-      <img src="docs/screenshots/reports.png" alt="Reports — punctuality rate, daily presence chart, per-department analytics">
-      <sub><b>Reports.</b> Punctuality, daily presence trend, per-department analytics — CSV export and a print-ready director's report.</sub>
-    </td>
-    <td valign="top">
       <img src="docs/screenshots/alerts.png" alt="Alerts — unknown faces and denied access, acknowledge workflow">
       <sub><b>Alerts.</b> Unknown faces and denied attempts land as live, acknowledgeable alerts — with an audit trail.</sub>
     </td>
-  </tr>
-  <tr>
     <td valign="top">
       <img src="docs/screenshots/doors.png" alt="Doors and cameras — drivers, thresholds, test-open">
       <sub><b>Doors &amp; cameras.</b> Per-door driver (webhook · Pi GPIO · simulation), relock, thresholds, test-open.</sub>
     </td>
+  </tr>
+  <tr>
     <td valign="top">
       <img src="docs/screenshots/monitor.png" alt="Live access monitor wall">
       <sub><b>Live monitor.</b> A wall view of access decisions as they happen — granted, refused, off-hours.</sub>
     </td>
+    <td valign="top"></td>
   </tr>
 </table>
 
