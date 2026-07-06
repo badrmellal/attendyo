@@ -1,0 +1,14 @@
+# The API image build context is the repo root (see docker-compose.yml), so
+# this keeps the build-context upload small and out of unrelated directories.
+.git
+node_modules
+**/node_modules
+.next
+**/.next
+__pycache__
+**/__pycache__
+*.pyc
+apps/console
+apps/gate
+docs/screenshots
+*.md

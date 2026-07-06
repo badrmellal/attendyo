@@ -42,11 +42,20 @@ import sys
 from pathlib import Path
 
 # Make the API package importable whether run as a script or a module, from the
-# repo root or elsewhere. The API app dir holds the shared demo/db modules.
-_REPO_ROOT = Path(__file__).resolve().parents[1]
-_API_DIR = _REPO_ROOT / "services" / "api"
-if str(_API_DIR) not in sys.path:
-    sys.path.insert(0, str(_API_DIR))
+# repo root, elsewhere on the host, OR inside the API container (where this
+# file lives at /app/scripts/seed_demo.py and the app package is at /app/app,
+# not <root>/services/api/app).
+_HERE = Path(__file__).resolve().parents[1]
+for _candidate in (_HERE / "services" / "api", _HERE):
+    if (_candidate / "app").is_dir():
+        if str(_candidate) not in sys.path:
+            sys.path.insert(0, str(_candidate))
+        break
+else:
+    raise SystemExit(
+        f"Could not locate the 'app' package near {_HERE} — run this from the "
+        "repo root or inside the liwan-api container."
+    )
 
 logging.basicConfig(
     level=os.environ.get("LIWAN_LOG_LEVEL", "INFO"),

@@ -31,6 +31,10 @@ services:
     volumes:
       - liwan-postgres-data:/var/lib/postgresql/data
       - ./db/schema.sql:/docker-entrypoint-initdb.d/10-liwan-schema.sql:ro
+    # Deliberately NOT published to the host: 5432 is a common local-Postgres
+    # port and the recommended seeding path (`docker compose exec liwan-api
+    # python scripts/seed_demo.py`) never needs it. Add your own `ports:`
+    # mapping to a free host port if you want a host-side DB client.
     networks: [liwan]
 
   liwan-engine-admin:
@@ -48,7 +52,13 @@ services:
       - ADMIN_JAVA_OPTS=${engine_admin_java_options}
       - MAX_FILE_SIZE=${max_file_size}
       - MAX_REQUEST_SIZE=${max_request_size}B
-    networks: [liwan]
+    networks:
+      liwan:
+        # The vision-engine UI image (liwan-engine-ui) ships an nginx config
+        # with the upstream hostname `compreface-admin` baked in from the
+        # upstream project. This alias satisfies that lookup without
+        # un-white-labeling the container's own name.
+        aliases: [compreface-admin]
 
   liwan-engine-api:
     # Liwan Vision Engine runtime image (recognition REST API).
@@ -67,7 +77,10 @@ services:
       - MAX_REQUEST_SIZE=${max_request_size}B
       - CONNECTION_TIMEOUT=${connection_timeout:-10000}
       - READ_TIMEOUT=${read_timeout:-60000}
-    networks: [liwan]
+    networks:
+      liwan:
+        # Same reasoning as liwan-engine-admin above.
+        aliases: [compreface-api]
 
   liwan-engine-core:
     # Liwan Vision Engine runtime image (ML inference, CPU-only).
@@ -80,7 +93,10 @@ services:
       - UWSGI_PROCESSES=${uwsgi_processes:-2}
       - UWSGI_THREADS=${uwsgi_threads:-2}
       - PYTHONUNBUFFERED=1
-    networks: [liwan]
+    networks:
+      liwan:
+        # Same reasoning as liwan-engine-admin above.
+        aliases: [compreface-core]
 
   liwan-engine-ui:
     # Liwan Vision Engine runtime image (engine console at :8000).

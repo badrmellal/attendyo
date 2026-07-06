@@ -107,7 +107,7 @@ async def update_access_group(
     return _to_group(row)
 
 
-@router.delete("/{group_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{group_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 async def delete_access_group(
     group_id: str,
     user: dict = Depends(security.require_operator),

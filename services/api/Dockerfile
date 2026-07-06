@@ -31,6 +31,10 @@ COPY services/api/app /app/app
 # self-heal the schema on startup even when the Postgres init script never ran.
 COPY db /app/db
 
+# Demo/admin scripts, so `docker compose exec liwan-api python scripts/seed_demo.py`
+# works out of the box with no extra install step.
+COPY scripts /app/scripts
+
 # Media lives on a volume.
 RUN mkdir -p /data/media
 

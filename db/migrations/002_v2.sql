@@ -4,7 +4,7 @@
 -- IF NOT EXISTS / conditional). The API also applies this at startup.
 -- ===========================================================================
 
-SET search_path TO liwan;
+SET search_path TO liwan, public;  -- keep public reachable: pgcrypto/uuid-ossp functions live there
 
 -- --- members: campus types + temporary-access window ----------------------
 ALTER TABLE members ADD COLUMN IF NOT EXISTS valid_from  DATE;

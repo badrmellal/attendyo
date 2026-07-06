@@ -128,7 +128,7 @@ async def update_door(
     return _to_door(row)
 
 
-@router.delete("/{door_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{door_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 async def delete_door(
     door_id: str,
     user: dict = Depends(security.require_operator),

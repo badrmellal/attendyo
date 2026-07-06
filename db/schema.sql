@@ -9,7 +9,7 @@
 
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";          -- gen_random_uuid()
 CREATE SCHEMA IF NOT EXISTS liwan;
-SET search_path TO liwan;
+SET search_path TO liwan, public;  -- keep public reachable: pgcrypto/uuid-ossp functions live there
 
 -- ---------------------------------------------------------------------------
 -- Sites — one physical location (HQ, branch, residence, plant)

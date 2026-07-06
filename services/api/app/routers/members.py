@@ -484,7 +484,7 @@ async def update_member(
 # --------------------------------------------------------------------------- #
 # Delete
 # --------------------------------------------------------------------------- #
-@router.delete("/{member_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{member_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 async def delete_member(
     member_id: str = Path(...),
     user: dict = Depends(security.require_operator),
