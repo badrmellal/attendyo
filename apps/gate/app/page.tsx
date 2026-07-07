@@ -8,6 +8,7 @@ import { Clock } from "@/components/Clock";
 import { BrandLogo } from "@/components/BrandLogo";
 import {
   accessEventToKioskResult,
+  ApiError,
   fetchBranding,
   isAccessEvent,
   recognizeFrame,
@@ -19,6 +20,7 @@ import {
 import { mockRecognize } from "@/lib/mock";
 import { DEFAULT_BRANDING, getStrings, isRTL } from "@/lib/branding";
 import type { Branding, KioskResult } from "@/lib/types";
+import { cn } from "@/lib/cn";
 
 /** Cadence: how often to attempt a capture while idle (~1.5s per the spec). */
 const CAPTURE_INTERVAL_MS = 1500;
@@ -38,6 +40,9 @@ export default function GatePage() {
   const [phase, setPhase] = useState<Phase>("idle");
   const [result, setResult] = useState<KioskResult | null>(null);
   const [cameraStatus, setCameraStatus] = useState<CameraStatus>("idle");
+  // Set when the API rejects this terminal's device key (401/403): an
+  // install-time misconfiguration. Surfaced quietly so setup can't fail silent.
+  const [configError, setConfigError] = useState(false);
 
   const cameraRef = useRef<CameraHandle>(null);
   // `phase` read inside the interval without re-subscribing it each render.
@@ -133,10 +138,16 @@ export default function GatePage() {
       if (!frame) return;
       const raw = await recognizeFrame(frame, config, controller.signal);
       // The API "denied" path uses door_opened=false; only `granted` opens.
+      setConfigError(false);
       present(toKioskResult(raw));
-    } catch {
-      // Network blip / abort / API down — stay idle and try again next tick.
-      // The kiosk must never crash or show an error wall to a person at a door.
+    } catch (err) {
+      // A 401/403 means the terminal itself is rejected (bad/missing device
+      // key) — a persistent install problem worth surfacing. Anything else
+      // (network blip / abort / API booting) stays silent: the kiosk must never
+      // show an error wall to a person at a door.
+      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+        setConfigError(true);
+      }
     } finally {
       window.clearTimeout(timeout);
       busyRef.current = false;
@@ -221,16 +232,35 @@ export default function GatePage() {
               <Clock locale={branding.locale} />
             </div>
 
-            <p className="mt-8 text-center text-[clamp(1.05rem,3vw,1.6rem)] font-medium text-text">
-              {cameraStatus === "blocked" && !config.mock
+            {(() => {
+              const blocked = cameraStatus === "blocked" && !config.mock;
+              const misconfigured = configError && !config.mock && !blocked;
+              const title = blocked
                 ? strings.cameraBlocked
-                : strings.lookHint}
-            </p>
-            {cameraStatus === "blocked" && !config.mock && (
-              <p className="mt-2 text-center text-sm text-text-muted">
-                {strings.cameraBlockedHint}
-              </p>
-            )}
+                : misconfigured
+                  ? strings.notConfigured
+                  : strings.lookHint;
+              const hint = blocked
+                ? strings.cameraBlockedHint
+                : misconfigured
+                  ? strings.notConfiguredHint
+                  : null;
+              return (
+                <>
+                  <p
+                    className={cn(
+                      "mt-8 text-center text-[clamp(1.05rem,3vw,1.6rem)] font-medium",
+                      misconfigured ? "text-accent" : "text-text",
+                    )}
+                  >
+                    {title}
+                  </p>
+                  {hint && (
+                    <p className="mt-2 text-center text-sm text-text-muted">{hint}</p>
+                  )}
+                </>
+              );
+            })()}
           </div>
         )}
       </section>

@@ -2,8 +2,11 @@
 
 /**
  * Avatar — photo when available, otherwise initials on a deterministic tint.
+ * Falls back to initials if the photo fails to load (404 / 401 / broken), so a
+ * missing image never shows a broken-image glyph.
  */
 
+import { useState } from "react";
 import { cn, initials, hueFromString } from "@/lib/utils";
 
 export function Avatar({
@@ -17,8 +20,10 @@ export function Avatar({
   size?: number;
   className?: string;
 }) {
+  const [failed, setFailed] = useState(false);
   const hue = hueFromString(name);
-  if (src) {
+
+  if (src && !failed) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
@@ -27,6 +32,7 @@ export function Avatar({
         width={size}
         height={size}
         style={{ width: size, height: size }}
+        onError={() => setFailed(true)}
         className={cn("rounded-full object-cover ring-1 ring-border", className)}
       />
     );

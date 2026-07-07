@@ -106,6 +106,24 @@ export function isMockForced() {
   return FORCE_MOCK;
 }
 
+/**
+ * Build a usable `<img src>` for a member's enrollment photo.
+ *
+ * The API returns `photo_url` as a relative, auth-gated path
+ * (`/api/members/{id}/photo`). A plain `<img>` can't send the bearer header, so
+ * we make it absolute against the API host and pass the operator JWT as the
+ * `?token=` query param (the same pattern the API accepts for CSV/SSE). Mock
+ * photos are already blob: URLs and are returned untouched.
+ */
+export function memberPhotoSrc(photoUrl?: string | null): string | undefined {
+  if (!photoUrl) return undefined;
+  if (photoUrl.startsWith("blob:") || photoUrl.startsWith("data:")) return photoUrl;
+  const base = photoUrl.startsWith("http") ? photoUrl : `${API_URL}${photoUrl}`;
+  const token = getToken();
+  if (!token) return base;
+  return `${base}${base.includes("?") ? "&" : "?"}token=${encodeURIComponent(token)}`;
+}
+
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
     super(message);

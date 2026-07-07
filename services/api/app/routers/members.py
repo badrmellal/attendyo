@@ -426,9 +426,15 @@ async def get_member(
 @router.get("/{member_id}/photo")
 async def get_member_photo(
     member_id: str = Path(...),
-    _user: dict = Depends(security.get_current_user),
+    _user: dict = Depends(security.get_current_user_flex),
 ) -> FileResponse:
-    """Serve the member's stored enrollment image."""
+    """Serve the member's stored enrollment image.
+
+    Uses ``get_current_user_flex`` so a browser ``<img>`` can authenticate with a
+    ``?token=`` query param (it cannot set an Authorization header) — the same
+    pattern as CSV export / SSE. Keeps biometric photos behind the operator
+    session rather than exposing them on an unauthenticated static path.
+    """
     row = await run_in_threadpool(
         db.query_one, "SELECT photo_path FROM members WHERE id = %s", (member_id,)
     )

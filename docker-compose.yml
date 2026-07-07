@@ -159,6 +159,17 @@ services:
       context: ./apps/gate
       args:
         - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+        # The kiosk authenticates its /api/recognize calls with the shared device
+        # key. NEXT_PUBLIC_* are inlined at BUILD time, so this must be a build
+        # arg (not just a runtime env) — without it the API returns 401 and the
+        # kiosk shows nothing. It ends up in the client bundle: acceptable for an
+        # on-prem terminal on a trusted LAN, which is exactly what holds this key.
+        - NEXT_PUBLIC_DEVICE_KEY=${ATTENDYO_DEVICE_KEY}
+        # Optional: pin this terminal to a specific camera/door so the door fires
+        # and attendance is attributed. Otherwise pass ?camera=<id>&door=<id> in
+        # the kiosk URL. Both default to empty.
+        - NEXT_PUBLIC_CAMERA_ID=${GATE_CAMERA_ID:-}
+        - NEXT_PUBLIC_DOOR_ID=${GATE_DOOR_ID:-}
     container_name: attendyo-gate
     restart: unless-stopped
     depends_on: [attendyo-api]

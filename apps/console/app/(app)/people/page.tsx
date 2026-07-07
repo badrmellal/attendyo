@@ -34,6 +34,7 @@ import {
   deleteMember,
   listAccessGroups,
   listMembers,
+  memberPhotoSrc,
   todayISO,
   updateMember,
 } from "@/lib/api";
@@ -134,7 +135,7 @@ export default function PeoplePage() {
       header: "Nom",
       cell: (m) => (
         <div className="flex items-center gap-3">
-          <Avatar name={m.full_name} src={m.photo_url} size={36} />
+          <Avatar name={m.full_name} src={memberPhotoSrc(m.photo_url)} size={36} />
           <div className="min-w-0">
             <p className="truncate font-medium text-text">{m.full_name}</p>
             <p className="truncate text-xs text-text-muted">

@@ -72,6 +72,10 @@ export interface Strings {
   cameraBlocked: string;
   cameraBlockedHint: string;
   connecting: string;
+  /** Terminal is rejected by the API (bad/missing device key) — an install-time
+   *  misconfiguration, shown quietly so it can't fail silently. */
+  notConfigured: string;
+  notConfiguredHint: string;
 }
 
 const STRINGS: Record<Locale, Strings> = {
@@ -93,6 +97,8 @@ const STRINGS: Record<Locale, Strings> = {
     cameraBlocked: "Caméra indisponible",
     cameraBlockedHint: "Autorisez l'accès à la caméra pour ce terminal.",
     connecting: "Connexion…",
+    notConfigured: "Terminal non configuré",
+    notConfiguredHint: "Clé appareil manquante ou invalide — voir l'administrateur.",
   },
   en: {
     lookHint: "Look at the camera",
@@ -111,6 +117,8 @@ const STRINGS: Record<Locale, Strings> = {
     cameraBlocked: "Camera unavailable",
     cameraBlockedHint: "Allow camera access for this terminal.",
     connecting: "Connecting…",
+    notConfigured: "Terminal not configured",
+    notConfiguredHint: "Device key missing or invalid — contact your administrator.",
   },
   ar: {
     lookHint: "انظر إلى الكاميرا",
@@ -129,6 +137,8 @@ const STRINGS: Record<Locale, Strings> = {
     cameraBlocked: "الكاميرا غير متاحة",
     cameraBlockedHint: "اسمح بالوصول إلى الكاميرا لهذا الجهاز.",
     connecting: "جارٍ الاتصال…",
+    notConfigured: "الجهاز غير مُهيَّأ",
+    notConfiguredHint: "مفتاح الجهاز مفقود أو غير صالح — راجع المسؤول.",
   },
 };
 
