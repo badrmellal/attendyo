@@ -28,13 +28,20 @@ export interface RecognizedMember {
 /**
  * Response of POST /api/recognize (CONTRACT.md → RecognizeResult).
  * The hot-path shape the kiosk renders.
+ *
+ * `decision` may additionally be `"no_face"` (Smart Gate rules v2.1): the
+ * engine found no face at all in the frame. It exists on the wire only — a
+ * silent non-event the kiosk must NOT render (no overlay, no red state).
  */
 export interface RecognizeResult {
-  decision: Decision;
+  decision: Decision | "no_face";
   member?: RecognizedMember;
   similarity?: number;
   door_opened: boolean;
-  /** Localized welcome line, computed server-side; the UI may also localize. */
+  /**
+   * Localized, direction- and time-aware greeting computed server-side
+   * ("Bonjour {name}" / "Au revoir {name}" — Smart Gate rules). Shown verbatim.
+   */
   greeting?: string;
   direction: Direction;
   /**
@@ -43,6 +50,10 @@ export interface RecognizeResult {
    * CONTRACT.md → Decision rules v2). Optional superset of the base contract.
    */
   reason?: string;
+  /** On exits: localized total on-site time, e.g. "8 h 12 sur site aujourd'hui". */
+  day_summary?: string;
+  /** One-shot door-side note left by an operator (delivered once, gold card). */
+  message?: string;
 }
 
 /**
@@ -89,6 +100,9 @@ export interface Settings {
 /**
  * A normalized result the overlay consumes. It always carries a resolved
  * direction and decision so the view layer never branches on `undefined`.
+ *
+ * `no_face` never becomes a KioskResult — it is filtered out at conversion
+ * (`toKioskResult` returns null) so the kiosk stays idle-scanning.
  */
 export interface KioskResult {
   decision: Decision;
@@ -99,6 +113,10 @@ export interface KioskResult {
   greeting?: string;
   /** Reason string for denied/unknown states, already localized when shown. */
   reason?: string;
+  /** Exit-day summary line ("8 h 12 sur site aujourd'hui"), server-verbatim. */
+  daySummary?: string;
+  /** One-shot operator note — rendered as the gold card, read aloud. */
+  message?: string;
   /** When the result was produced — used for the check-in/out timestamp line. */
   at: Date;
 }

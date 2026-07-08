@@ -6,6 +6,7 @@
  *    unacknowledged alerts (→ /alerts), denied.
  *  - Hourly entries bar chart.
  *  - Live access feed (SSE).
+ *  - "{product} IQ" insights panel (v2.1 — local behavioural intelligence).
  *  - Latest granted entries table.
  */
 
@@ -26,6 +27,7 @@ import {
 } from "lucide-react";
 import { StatCard } from "@/components/StatCard";
 import { HourlyChart } from "@/components/HourlyChart";
+import { InsightsPanel } from "@/components/InsightsPanel";
 import { LiveFeed } from "@/components/LiveFeed";
 import { DataTable, type Column } from "@/components/DataTable";
 import { DecisionPill } from "@/components/StatusPill";
@@ -256,6 +258,9 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* "{product} IQ" — local behavioural insights, below the live feed */}
+      <InsightsPanel />
 
       {/* Latest entries */}
       <div>

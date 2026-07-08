@@ -14,6 +14,7 @@ import {
   Filter,
   FileUp,
   Mail,
+  MessageSquareText,
   Phone,
   Pencil,
   PauseCircle,
@@ -22,6 +23,7 @@ import {
 } from "lucide-react";
 import { DataTable, type Column } from "@/components/DataTable";
 import { EnrollDialog } from "@/components/EnrollDialog";
+import { KioskMessageDialog } from "@/components/KioskMessageDialog";
 import { MemberDialog } from "@/components/MemberDialog";
 import { ImportMembersDialog } from "@/components/ImportMembersDialog";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
@@ -71,6 +73,7 @@ export default function PeoplePage() {
   const [importOpen, setImportOpen] = useState(false);
   const [accessGroups, setAccessGroups] = useState<AccessGroup[]>([]);
   const [editing, setEditing] = useState<Member | null>(null);
+  const [messaging, setMessaging] = useState<Member | null>(null);
   const [deleting, setDeleting] = useState<Member | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -137,7 +140,18 @@ export default function PeoplePage() {
         <div className="flex items-center gap-3">
           <Avatar name={m.full_name} src={memberPhotoSrc(m.photo_url)} size={36} />
           <div className="min-w-0">
-            <p className="truncate font-medium text-text">{m.full_name}</p>
+            <div className="flex items-center gap-1.5">
+              <p className="truncate font-medium text-text">{m.full_name}</p>
+              {m.kiosk_message && (
+                <span
+                  className="shrink-0 text-accent"
+                  title={`Message d'accueil en attente : « ${m.kiosk_message} »`}
+                  aria-label="Message d'accueil en attente"
+                >
+                  <MessageSquareText className="h-3.5 w-3.5" />
+                </span>
+              )}
+            </div>
             <p className="truncate text-xs text-text-muted">
               {m.title || term.memberTypeLabels[m.member_type]}
               {m.external_id ? ` · ${m.external_id}` : ""}
@@ -201,6 +215,11 @@ export default function PeoplePage() {
         const suspendable = m.status === "active";
         const actions: RowAction[] = [
           { label: "Modifier", icon: Pencil, onSelect: () => setEditing(m) },
+          {
+            label: "Message d'accueil",
+            icon: MessageSquareText,
+            onSelect: () => setMessaging(m),
+          },
           {
             label: suspendable ? "Suspendre" : "Activer",
             icon: suspendable ? PauseCircle : PlayCircle,
@@ -354,6 +373,17 @@ export default function PeoplePage() {
         onImported={() => refresh()}
       />
 
+      <KioskMessageDialog
+        open={messaging !== null}
+        member={messaging}
+        onClose={() => setMessaging(null)}
+        onSaved={(saved) =>
+          // Full replace so a CLEARED message (key absent server-side) never
+          // leaves a stale gold icon behind.
+          setMembers((prev) => prev.map((m) => (m.id === saved.id ? saved : m)))
+        }
+      />
+
       <MemberDialog
         open={editing !== null}
         member={editing}
@@ -361,7 +391,9 @@ export default function PeoplePage() {
         departments={departments}
         onClose={() => setEditing(null)}
         onSaved={(saved) =>
-          setMembers((prev) => prev.map((m) => (m.id === saved.id ? { ...m, ...saved } : m)))
+          // PATCH returns the full Member — replace so cleared optional fields
+          // (kiosk_message, validity window) don't linger from the old row.
+          setMembers((prev) => prev.map((m) => (m.id === saved.id ? saved : m)))
         }
       />
 

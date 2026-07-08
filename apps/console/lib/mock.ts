@@ -25,6 +25,7 @@ import type {
   Camera,
   DepartmentReport,
   Door,
+  Insight,
   Member,
   MemberReport,
   OperatorUser,
@@ -66,16 +67,18 @@ type Seed = {
   /** Days relative to today for the temporary-access window (v2). */
   validFromDays?: number;
   validUntilDays?: number;
+  /** One-shot door-side message pending delivery (v2.1 Smart Gate). */
+  kioskMessage?: string;
 };
 
 const SEED_PEOPLE: Seed[] = [
   { name: "Yasmine El Amrani", dept: "Direction", title: "Directrice Générale", type: "employee" },
   { name: "Omar Benjelloun", dept: "Sécurité", title: "Chef de Sécurité", type: "employee" },
-  { name: "Salma Tazi", dept: "Ressources Humaines", title: "Responsable RH", type: "employee" },
+  { name: "Salma Tazi", dept: "Ressources Humaines", title: "Responsable RH", type: "employee", kioskMessage: "Réunion déplacée à 14 h — salle B" },
   { name: "Karim Idrissi", dept: "Opérations", title: "Directeur des Opérations", type: "employee" },
   { name: "Nadia Bennani", dept: "Finance", title: "Contrôleuse de Gestion", type: "employee" },
   { name: "Youssef Alaoui", dept: "IT", title: "Administrateur Systèmes", type: "employee" },
-  { name: "Hajar Chraibi", dept: "Finance", title: "Comptable", type: "employee" },
+  { name: "Hajar Chraibi", dept: "Finance", title: "Comptable", type: "employee", kioskMessage: "Passez au bureau RH signer votre fiche de paie" },
   { name: "Mehdi Lahlou", dept: "Opérations", title: "Superviseur", type: "employee" },
   { name: "Imane Sefrioui", dept: "Accueil", title: "Hôtesse d'Accueil", type: "employee" },
   { name: "Rachid Berrada", dept: "Sécurité", title: "Agent de Sécurité", type: "employee" },
@@ -125,6 +128,7 @@ export const MOCK_MEMBERS: Member[] = SEED_PEOPLE.map((p, i) => ({
   phone: `+212 6${String(10000000 + i * 137).slice(0, 8)}`,
   valid_from: p.validFromDays != null ? shiftDate(todayISO(), p.validFromDays) : undefined,
   valid_until: p.validUntilDays != null ? shiftDate(todayISO(), p.validUntilDays) : undefined,
+  kiosk_message: p.kioskMessage,
   status: p.status ?? "active",
   created_at: iso(-1000 * 60 * 60 * 24 * (30 + i)),
 }));
@@ -454,6 +458,9 @@ export const MOCK_SETTINGS: Settings = {
     min_revisit_seconds: 60,
     auto_open_on_grant: true,
   },
+  security: {
+    alert_cooldown_seconds: 45,
+  },
 };
 
 // In-memory mutable copy so Settings edits "stick" within a session.
@@ -730,6 +737,7 @@ const ALERT_SEVERITY: Record<AlertKind, Alert["severity"]> = {
   unknown_face: "critical",
   not_authorized: "warning",
   off_schedule: "warning",
+  anti_passback: "info",
   system: "info",
 };
 
@@ -737,6 +745,7 @@ const ALERT_MESSAGE: Record<AlertKind, (doorName?: string) => string> = {
   unknown_face: (d) => `Visage inconnu détecté${d ? ` — ${d}` : ""}`,
   not_authorized: (d) => `Tentative d'accès non autorisée${d ? ` — ${d}` : ""}`,
   off_schedule: (d) => `Accès hors horaire${d ? ` — ${d}` : ""}`,
+  anti_passback: (d) => `Double entrée détectée${d ? ` — ${d}` : ""}`,
   system: () => "Anomalie système",
 };
 
@@ -765,11 +774,25 @@ function alertFromEvent(ev: AccessEvent, acknowledged: boolean): Alert {
 }
 
 // Seed: every non-granted backlog event becomes an alert; older ones are
-// already acknowledged so the list shows both states. Plus one system alert.
+// already acknowledged so the list shows both states. Plus one soft
+// anti-passback (granted double entry at an "in" door — v2.1 Smart Gate)
+// and one system alert.
 let liveAlerts: Alert[] = [
   ...MOCK_EVENTS.filter((e) => e.decision !== "granted").map((e, i) =>
     alertFromEvent(e, i >= 4),
   ),
+  {
+    id: alertCounter++,
+    ts: iso(-1000 * 60 * 42),
+    kind: "anti_passback" as const,
+    severity: "info" as const,
+    message: `Double entrée : ${MOCK_MEMBERS[3].full_name} est déjà sur site — ${MOCK_DOORS[1].name}`,
+    door_id: MOCK_DOORS[1].id,
+    door_name: MOCK_DOORS[1].name,
+    member_id: MOCK_MEMBERS[3].id,
+    member_name: MOCK_MEMBERS[3].full_name,
+    acknowledged: false,
+  },
   {
     id: alertCounter++,
     ts: iso(-1000 * 60 * 60 * 26),
@@ -1046,4 +1069,64 @@ export function mockPresenceNow(): PresenceNow {
     })
     .sort((a, b) => +new Date(a.first_in_ts) - +new Date(b.first_in_ts));
   return { count: people.length, people };
+}
+
+// --------------------------------------------------------------------------
+// v2.1 — Insights, "{product} IQ" (`GET /api/insights`).
+// The real API computes these deterministically from attendance history (pure
+// SQL/stats on the box — nothing stored, nothing leaves the server). The mock
+// mirrors that: same roster → same lines, covering every insight kind.
+// --------------------------------------------------------------------------
+export function mockInsights(limit = 10): Insight[] {
+  const today = todayISO();
+  const yesterday = shiftDate(today, -1);
+  const withMember = (m: Member) => ({
+    member_id: m.id,
+    member_name: m.full_name,
+    department: m.department,
+  });
+  const nadia = MOCK_MEMBERS[4]; // Finance — Contrôleuse de Gestion
+  const mehdi = MOCK_MEMBERS[7]; // Opérations — Superviseur
+  const imane = MOCK_MEMBERS[8]; // Accueil — Hôtesse d'Accueil
+  const anas = MOCK_MEMBERS[11]; // IT — Ingénieur DevOps
+  const hamza = MOCK_MEMBERS[13]; // Opérations — Technicien
+
+  const insights: Insight[] = [
+    {
+      kind: "unusual_arrival",
+      ...withMember(nadia),
+      text: `${nadia.full_name} est arrivée à 10 h 47 — 1 h 22 plus tard que sa médiane sur 30 jours.`,
+      date: today,
+    },
+    {
+      kind: "absence_streak",
+      ...withMember(hamza),
+      text: `${hamza.full_name} est absent depuis 4 jours ouvrés consécutifs.`,
+      date: today,
+    },
+    {
+      kind: "punctuality_streak",
+      ...withMember(imane),
+      text: `${imane.full_name} enchaîne 16 jours consécutifs à l'heure — série en cours.`,
+      date: today,
+    },
+    {
+      kind: "record_presence",
+      text: `Record de présence : 21 personnes sur site en même temps — plus haut niveau sur 30 jours.`,
+      date: today,
+    },
+    {
+      kind: "unusual_arrival",
+      ...withMember(mehdi),
+      text: `${mehdi.full_name} est arrivé à 11 h 05 — 2 h 10 plus tard que sa médiane sur 30 jours.`,
+      date: yesterday,
+    },
+    {
+      kind: "punctuality_streak",
+      ...withMember(anas),
+      text: `${anas.full_name} enchaîne 12 jours consécutifs à l'heure.`,
+      date: yesterday,
+    },
+  ];
+  return insights.slice(0, Math.max(0, limit));
 }

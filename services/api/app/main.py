@@ -39,6 +39,7 @@ from .routers import (
     doors,
     events,
     health,
+    insights,
     members,
     presence,
     recognize,
@@ -167,6 +168,8 @@ def create_app() -> FastAPI:
     app.include_router(alerts.router)
     app.include_router(audit_router.router)
     app.include_router(users.router)
+    # v2.1 (Smart Gate).
+    app.include_router(insights.router)
 
     # Static media (snapshots). Created at startup; mounting a missing dir would
     # raise, so ensure it exists here too for safety.

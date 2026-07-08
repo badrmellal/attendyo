@@ -56,8 +56,8 @@ router = APIRouter(prefix="/api/members", tags=["members"])
 
 _MEMBER_COLUMNS = (
     "id, external_id, full_name, subject_name, member_type, department, title, "
-    "email, phone, access_group_id, photo_path, valid_from, valid_until, status, "
-    "created_at"
+    "email, phone, access_group_id, photo_path, valid_from, valid_until, "
+    "kiosk_message, status, created_at"
 )
 
 _MAX_IMAGE_BYTES = 12 * 1024 * 1024  # 12 MB safety bound
@@ -79,6 +79,7 @@ def _to_member(row: dict[str, Any]) -> Member:
         photo_url=(f"/api/members/{row['id']}/photo" if row.get("photo_path") else None),
         valid_from=row.get("valid_from"),
         valid_until=row.get("valid_until"),
+        kiosk_message=row.get("kiosk_message"),
         status=row["status"],
         created_at=row["created_at"],
     )

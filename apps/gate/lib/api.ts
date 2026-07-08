@@ -28,6 +28,10 @@ export interface KioskConfig {
   cameraId?: string;
   doorId?: string;
   mock: boolean;
+  /** Spoken greeting (speechSynthesis). Off via ?voice=0 / NEXT_PUBLIC_VOICE=0. */
+  voice: boolean;
+  /** WebAudio chime. Off via ?sound=0 / NEXT_PUBLIC_SOUND=0. */
+  sound: boolean;
 }
 
 /**
@@ -48,7 +52,17 @@ export function resolveConfig(search?: URLSearchParams): KioskConfig {
     cameraId: cameraId || undefined,
     doorId: doorId || undefined,
     mock,
+    // Voice + chime default ON; a "0"/"false" query param or env var opts out
+    // per terminal (Smart Gate rules). Query wins, like `mock` above.
+    voice: featureFlag(q.get("voice"), process.env.NEXT_PUBLIC_VOICE),
+    sound: featureFlag(q.get("sound"), process.env.NEXT_PUBLIC_SOUND),
   };
+}
+
+/** Default-on feature flag: `?x=0` (or `false`) disables; else env decides. */
+function featureFlag(param: string | null, env: string | undefined): boolean {
+  if (param !== null) return param !== "0" && param !== "false";
+  return env !== "0" && env !== "false";
 }
 
 /** Thrown on any non-2xx API response. */
@@ -141,8 +155,13 @@ export async function recognizeFrame(
 /**
  * Convert a contract RecognizeResult into the normalized KioskResult the UI
  * renders. Reason text is left raw here; the view layer localizes by decision.
+ *
+ * Returns null for `no_face` (Smart Gate rules v2.1): an empty frame is a
+ * silent non-event — no overlay, no red state, the kiosk stays idle-scanning.
+ * Only an actual face that fails a rule produces negative feedback.
  */
-export function toKioskResult(r: RecognizeResult): KioskResult {
+export function toKioskResult(r: RecognizeResult): KioskResult | null {
+  if (r.decision === "no_face") return null;
   return {
     decision: r.decision,
     direction: r.direction ?? "unknown",
@@ -151,6 +170,8 @@ export function toKioskResult(r: RecognizeResult): KioskResult {
     doorOpened: Boolean(r.door_opened),
     greeting: r.greeting,
     reason: r.reason,
+    daySummary: r.day_summary,
+    message: r.message,
     at: new Date(),
   };
 }

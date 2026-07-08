@@ -5,16 +5,26 @@ frame it:
 
 1. (Demo mode) returns a random active member without touching the engine, or
 2. Calls the vision engine's ``recognize`` on the uploaded image.
+   **No face at all in the frame** (empty hallway, blur) → returns
+   ``{decision:"no_face", door_opened:false, direction:"unknown"}`` and does
+   NOTHING else — no event, no alert, no attendance, no door, no SSE
+   (Smart Gate rules v2.1). ``no_face`` exists on the wire only.
 3. Runs the contract decision rules (``services.decision``).
-4. Writes an ``access_event`` (with optional snapshot).
-5. On ``granted`` (non-debounced) updates ``attendance_days`` and fires the
-   door driver. On any non-granted decision, records an ``alerts`` row.
+4. On ``granted``: infers the effective direction (door in/out wins; both/none
+   → on-site ⇒ out else in), writes the event with it, feeds it to the
+   attendance roll-up, claims the member's one-shot ``kiosk_message``, and
+   fires the door driver. Exits also get a localized ``day_summary``.
+5. On any non-granted decision, records an ``alerts`` row (per-(door, kind)
+   cooldown). Granted double-entries at an explicitly-"in" door add a soft
+   ``anti_passback`` info alert (door still opens).
 6. Publishes the event (and any alert) onto the SSE bus (``event: access`` /
    ``event: alert``).
-7. Returns a ``RecognizeResult`` with a localized greeting.
+7. Returns a ``RecognizeResult`` with a localized, direction- and time-aware
+   greeting.
 
-Returns 200 for every recognised/declined frame (the decision lives in the body);
-only auth and engine-outage produce error status codes.
+Returns 200 for every analysed frame (the decision lives in the body); only
+auth, bad input, and engine-outage produce error status codes. Demo mode flows
+through the exact same greeting/direction/message code as the real engine path.
 """
 
 from __future__ import annotations
@@ -44,19 +54,73 @@ router = APIRouter(prefix="/api", tags=["recognition"])
 _DEFAULT_THRESHOLD = 0.88
 _MAX_IMAGE_BYTES = 12 * 1024 * 1024
 
-# Localized greeting templates by locale (contract: fr/en/ar).
-_GREETINGS = {
-    "fr": "Bienvenue {name}",
-    "en": "Welcome {name}",
-    "ar": "مرحبا {name}",
+# Localized greetings by locale (contract: fr/en/ar) — direction- and
+# time-aware per the Smart Gate rules:
+#   in  : before 12:00 site-local → morning, 18:00+ → evening, else day.
+#   out : farewell (+ the kiosk shows the "Sortie" chip and a day summary).
+_GREETINGS: dict[str, dict[str, str]] = {
+    "fr": {
+        "morning": "Bonjour {name}",
+        "day": "Bienvenue {name}",
+        "evening": "Bonsoir {name}",
+        "out": "Au revoir {name}",
+    },
+    "en": {
+        "morning": "Good morning {name}",
+        "day": "Welcome {name}",
+        "evening": "Good evening {name}",
+        "out": "Goodbye {name}",
+    },
+    "ar": {
+        "morning": "صباح الخير {name}",
+        "day": "مرحبا {name}",
+        "evening": "مساء الخير {name}",
+        "out": "مع السلامة {name}",
+    },
+}
+
+# Localized day summary on exits: total on-site time today ("Xh Ymin" kept
+# simple; fr example from the contract: "8 h 12 sur site aujourd'hui").
+# Stays under one hour use the minutes-only form ("25 min sur site aujourd'hui")
+# so the kiosk never reads "0 h 25".
+_DAY_SUMMARIES = {
+    "fr": "{h} h {m:02d} sur site aujourd'hui",
+    "en": "{h} h {m:02d} min on site today",
+    "ar": "{h} س {m:02d} د في الموقع اليوم",
+}
+_DAY_SUMMARIES_UNDER_HOUR = {
+    "fr": "{m} min sur site aujourd'hui",
+    "en": "{m} min on site today",
+    "ar": "{m} د في الموقع اليوم",
 }
 
 
-def _greeting(locale: str, name: str) -> str:
-    template = _GREETINGS.get(locale, _GREETINGS["fr"])
-    # Use only the first name for a warm, uncluttered kiosk line.
+def _greeting(locale: str, name: str, direction: str, local_hour: int) -> str:
+    """Build the localized, direction- and time-aware kiosk greeting."""
+    table = _GREETINGS.get(locale, _GREETINGS["fr"])
+    # {name} = first token of full_name for a warm, uncluttered kiosk line.
     first = name.split(" ")[0] if name else name
-    return template.format(name=first)
+    if direction == "out":
+        key = "out"
+    elif local_hour < 12:
+        key = "morning"
+    elif local_hour >= 18:
+        key = "evening"
+    else:
+        key = "day"
+    return table[key].format(name=first)
+
+
+def _day_summary(locale: str, worked_seconds: Optional[int]) -> Optional[str]:
+    """Localized total on-site time for today, or None when not computable."""
+    if worked_seconds is None or worked_seconds < 0:
+        return None
+    hours, minutes = divmod(int(worked_seconds) // 60, 60)
+    if hours == 0:
+        template = _DAY_SUMMARIES_UNDER_HOUR.get(locale, _DAY_SUMMARIES_UNDER_HOUR["fr"])
+        return template.format(m=max(minutes, 1))
+    template = _DAY_SUMMARIES.get(locale, _DAY_SUMMARIES["fr"])
+    return template.format(h=hours, m=minutes)
 
 
 def _load_door(door_id: Optional[str]) -> Optional[dict[str, Any]]:
@@ -110,6 +174,37 @@ def _write_event(
     )
     assert row is not None
     return row
+
+
+def _claim_kiosk_message(member_id: str) -> Optional[str]:
+    """Atomically deliver-and-clear the member's one-shot door-side message.
+
+    ``FOR UPDATE`` inside the CTE serialises two kiosks recognising the same
+    member at once: the second claim re-reads the already-cleared row and
+    returns nothing, so the note is delivered exactly once. Never raises —
+    message delivery must not break the hot path.
+    """
+    try:
+        row = db.execute_returning(
+            """
+            WITH claimed AS (
+                SELECT id, kiosk_message
+                FROM members
+                WHERE id = %s AND kiosk_message IS NOT NULL
+                FOR UPDATE
+            )
+            UPDATE members m
+            SET kiosk_message = NULL, updated_at = now()
+            FROM claimed
+            WHERE m.id = claimed.id AND claimed.kiosk_message IS NOT NULL
+            RETURNING claimed.kiosk_message AS message
+            """,
+            (member_id,),
+        )
+    except Exception as exc:  # pragma: no cover - hot path must not break
+        logger.warning("Could not claim kiosk message for %s: %s", member_id, exc)
+        return None
+    return row["message"] if row else None
 
 
 def _resolve_threshold(camera: Optional[dict[str, Any]]) -> float:
@@ -211,11 +306,19 @@ async def recognize(
                     else None
                 ),
             )
+        except engine.EngineNoFace:
+            # Nobody in frame — a silent non-event end to end (Smart Gate v2.1):
+            # no event, no alert, no attendance, no door action, no SSE.
+            return RecognizeResult(
+                decision="no_face", door_opened=False, direction="unknown"
+            )
         except engine.EngineUnavailable as exc:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="Recognition engine unavailable",
             ) from exc
+        except engine.EngineRejected as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
 
         decision = await run_in_threadpool(
             decision_service.decide,
@@ -229,6 +332,26 @@ async def recognize(
             now=now,
         )
 
+    # ---- Effective direction + site-local context (grants only) ------------ #
+    # Contract: door "in"/"out" wins; "both"/no door → on-site ⇒ out, else in.
+    # The same context also powers the time-aware greeting and anti-passback.
+    door_id_eff = str(door["id"]) if door else None
+    camera_id_eff = str(camera["id"]) if camera else None
+    grant_ctx: Optional[dict[str, Any]] = None
+    was_on_site = False
+    if decision.decision == "granted" and decision.member:
+        grant_ctx = await run_in_threadpool(
+            attendance_service.grant_context,
+            str(decision.member["id"]),
+            door_id_eff,
+        )
+        was_on_site = bool(grant_ctx["on_site"])
+        door_dir = door.get("direction") if door else None
+        if door_dir in ("in", "out"):
+            decision.direction = door_dir
+        else:
+            decision.direction = "out" if was_on_site else "in"
+
     # ---- Persist snapshot (best-effort) ------------------------------------ #
     snapshot_path: Optional[str] = None
     try:
@@ -237,8 +360,6 @@ async def recognize(
         logger.warning("Could not store snapshot: %s", exc)
 
     # ---- Write event ------------------------------------------------------- #
-    door_id_eff = str(door["id"]) if door else None
-    camera_id_eff = str(camera["id"]) if camera else None
     event_row = await run_in_threadpool(
         _write_event,
         decision=decision,
@@ -248,18 +369,37 @@ async def recognize(
     )
 
     door_opened = False
+    day_summary: Optional[str] = None
+    kiosk_message: Optional[str] = None
 
-    # ---- On grant: attendance + door --------------------------------------- #
+    # ---- On grant: attendance + message + door ------------------------------ #
     if decision.decision == "granted" and decision.member:
         member_id = str(decision.member["id"])
+        attendance_row: Optional[dict[str, Any]] = None
         if not decision.debounced:
-            await run_in_threadpool(
+            # The roll-up consumes the INFERRED direction (an inferred "out"
+            # sets last_out_ts).
+            attendance_row = await run_in_threadpool(
                 attendance_service.record_granted_event,
                 member_id=member_id,
                 event_ts=event_row["ts"],
                 direction=decision.direction,
                 door_id=door_id_eff,
             )
+        elif decision.direction == "out" and grant_ctx is not None:
+            # Debounced exit: read the existing row so the farewell still
+            # carries today's summary.
+            attendance_row = await run_in_threadpool(
+                attendance_service.today_row, member_id, grant_ctx["work_date"]
+            )
+
+        # Day summary AFTER the roll-up, exits only (contract).
+        if decision.direction == "out" and attendance_row is not None:
+            day_summary = _day_summary(locale, attendance_row.get("worked_seconds"))
+
+        # One-shot door-side message: deliver + clear atomically.
+        kiosk_message = await run_in_threadpool(_claim_kiosk_message, member_id)
+
         # Fire the door driver if a door is bound and auto-open is on.
         if door and door.get("enabled", True) and attendance_cfg.auto_open_on_grant:
             driver = door_factory.build(door)
@@ -278,7 +418,10 @@ async def recognize(
             except Exception as exc:  # pragma: no cover - driver-specific
                 logger.warning("Door driver failed on grant: %s", exc)
 
-    # ---- Alert for every non-granted decision (v2) -------------------------- #
+    # ---- Alerts -------------------------------------------------------------- #
+    # Non-granted decisions alert as before; a granted double-entry at an
+    # explicitly-"in" door adds a soft anti-passback info alert (door still
+    # opened). Both respect the per-(door, kind) cooldown.
     alert_payload: Optional[dict[str, Any]] = None
     if decision.decision != "granted":
         alert_payload = await run_in_threadpool(
@@ -290,6 +433,21 @@ async def recognize(
             door_name=door.get("name") if door else None,
             member_id=str(decision.member["id"]) if decision.member else None,
             member_name=decision.member.get("full_name") if decision.member else None,
+        )
+    elif (
+        decision.member
+        and not decision.debounced
+        and was_on_site
+        and door is not None
+        and door.get("direction") == "in"
+    ):
+        alert_payload = await run_in_threadpool(
+            alerts_router.record_anti_passback_alert,
+            event_id=event_row["id"],
+            door_id=door_id_eff,
+            door_name=door.get("name"),
+            member_id=str(decision.member["id"]),
+            member_name=decision.member.get("full_name"),
         )
 
     # ---- Publish SSE events -------------------------------------------------- #
@@ -310,7 +468,12 @@ async def recognize(
             title=decision.member.get("title"),
         )
         if decision.decision == "granted":
-            greeting = _greeting(locale, decision.member["full_name"])
+            local_hour = (
+                grant_ctx["local_now"].hour if grant_ctx is not None else now.hour
+            )
+            greeting = _greeting(
+                locale, decision.member["full_name"], decision.direction, local_hour
+            )
 
     return RecognizeResult(
         decision=decision.decision,
@@ -319,6 +482,9 @@ async def recognize(
         door_opened=door_opened,
         greeting=greeting,
         direction=decision.direction,
+        reason=decision.reason if decision.decision != "granted" else None,
+        day_summary=day_summary,
+        message=kiosk_message,
     )
 
 
@@ -333,8 +499,10 @@ def _demo_decision(
 ) -> Optional[decision_service.Decision]:
     """Fabricate a granted decision for a random active member (demo mode).
 
-    Bypasses the engine entirely. Still honours the debounce so repeated demo
-    frames don't double-count attendance.
+    Bypasses the engine entirely; everything downstream (direction inference,
+    greetings, day summary, kiosk message, anti-passback) flows through the
+    same code as a real recognition. Still honours the debounce so repeated
+    demo frames don't double-count attendance.
     """
     member = _pick_demo_member()
     if member is None:

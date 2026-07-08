@@ -1,7 +1,8 @@
 """Settings / branding router.
 
-* ``GET /api/settings`` → ``{ branding, attendance }`` (any authenticated user).
-* ``PUT /api/settings`` → update branding and/or attendance (**admin only**).
+* ``GET /api/settings`` → ``{ branding, attendance, security }`` (operator JWT
+  or device key).
+* ``PUT /api/settings`` → update any section (**admin only**).
 
 Branding powers the white-label: Console and Gate read ``product_name``,
 ``primary_color``, ``locale`` … from here and never hard-code "Attendyo". Defaults
@@ -21,6 +22,7 @@ from ..core import audit, db, security
 from ..models.schemas import (
     AttendanceSettings,
     Branding,
+    SecuritySettings,
     SettingsOut,
     SettingsUpdate,
 )
@@ -43,6 +45,7 @@ _DEFAULT_ATTENDANCE = AttendanceSettings(
     min_revisit_seconds=60,
     auto_open_on_grant=True,
 )
+_DEFAULT_SECURITY = SecuritySettings(alert_cooldown_seconds=45)
 
 
 def _get_setting(key: str) -> dict[str, Any] | None:
@@ -64,8 +67,20 @@ def load_attendance() -> AttendanceSettings:
     )
 
 
+def load_security() -> SecuritySettings:
+    """Resolve security config (alert cooldown …), falling back to defaults."""
+    raw = _get_setting("security") or {}
+    return _DEFAULT_SECURITY.model_copy(
+        update={k: v for k, v in raw.items() if v is not None}
+    )
+
+
 def _read_settings() -> SettingsOut:
-    return SettingsOut(branding=load_branding(), attendance=load_attendance())
+    return SettingsOut(
+        branding=load_branding(),
+        attendance=load_attendance(),
+        security=load_security(),
+    )
 
 
 def _write_settings(update: SettingsUpdate) -> SettingsOut:
@@ -80,6 +95,12 @@ def _write_settings(update: SettingsUpdate) -> SettingsOut:
             "INSERT INTO settings (key, value) VALUES ('attendance', %s::jsonb) "
             "ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
             (json.dumps(update.attendance.model_dump()),),
+        )
+    if update.security is not None:
+        db.execute(
+            "INSERT INTO settings (key, value) VALUES ('security', %s::jsonb) "
+            "ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
+            (json.dumps(update.security.model_dump()),),
         )
     return _read_settings()
 
@@ -101,7 +122,11 @@ async def put_settings_endpoint(
     """Update settings. Admin-only. Omitted sections are left unchanged."""
     result = await run_in_threadpool(_write_settings, payload)
     sections = [
-        s for s, v in (("branding", payload.branding), ("attendance", payload.attendance))
+        s for s, v in (
+            ("branding", payload.branding),
+            ("attendance", payload.attendance),
+            ("security", payload.security),
+        )
         if v is not None
     ]
     await run_in_threadpool(

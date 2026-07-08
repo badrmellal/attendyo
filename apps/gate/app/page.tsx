@@ -18,7 +18,14 @@ import {
   type KioskConfig,
 } from "@/lib/api";
 import { mockRecognize } from "@/lib/mock";
-import { DEFAULT_BRANDING, getStrings, isRTL } from "@/lib/branding";
+import {
+  DEFAULT_BRANDING,
+  getStrings,
+  isRTL,
+  resolveGreeting,
+} from "@/lib/branding";
+import { speakGreeting } from "@/lib/speech";
+import { playChime } from "@/lib/sound";
 import type { Branding, KioskResult } from "@/lib/types";
 import { cn } from "@/lib/cn";
 
@@ -27,6 +34,8 @@ const CAPTURE_INTERVAL_MS = 1500;
 /** How long a result stays on screen before returning to idle. */
 const GRANTED_HOLD_MS = 3500;
 const DENIED_HOLD_MS = 2600;
+/** Results carrying a door-side message stay longer so it can be read at 2m. */
+const MESSAGE_HOLD_MS = 7000;
 /** Abort a recognize call that hangs longer than this. */
 const RECOGNIZE_TIMEOUT_MS = 8000;
 /** Re-pull branding occasionally so a settings change reaches the kiosk. */
@@ -36,7 +45,11 @@ type Phase = "idle" | "showing";
 
 export default function GatePage() {
   const [branding, setBranding] = useState<Branding>(DEFAULT_BRANDING);
-  const [config, setConfig] = useState<KioskConfig>({ mock: false });
+  const [config, setConfig] = useState<KioskConfig>({
+    mock: false,
+    voice: true,
+    sound: true,
+  });
   const [phase, setPhase] = useState<Phase>("idle");
   const [result, setResult] = useState<KioskResult | null>(null);
   const [cameraStatus, setCameraStatus] = useState<CameraStatus>("idle");
@@ -93,15 +106,48 @@ export default function GatePage() {
 
   const strings = useMemo(() => getStrings(branding.locale), [branding.locale]);
 
+  // Latest config/branding readable from stable callbacks (present, SSE)
+  // without re-creating them each render.
+  const configRef = useRef(config);
+  configRef.current = config;
+  const brandingRef = useRef(branding);
+  brandingRef.current = branding;
+
   // --- present a result, then schedule the return to idle -----------------
+  // Sound + voice fire here so every path (webcam recognize, mock plan, SSE
+  // events from a fixed camera on this door) gets the same treatment. Both
+  // helpers are hard no-throw, so the hot path cannot be hurt by audio.
   const present = useCallback((r: KioskResult) => {
     setResult(r);
     setPhase("showing");
+    const cfg = configRef.current;
+    playChime(r.decision, cfg.sound);
+    if (r.decision === "granted") {
+      const locale = brandingRef.current.locale;
+      const s = getStrings(locale);
+      speakGreeting({
+        // Speak exactly what the overlay shows (server-verbatim or fallback).
+        greeting: resolveGreeting(
+          r.greeting,
+          r.direction,
+          r.member?.full_name ?? "",
+          s,
+        ),
+        message: r.message,
+        locale,
+        enabled: cfg.voice,
+      });
+    }
   }, []);
 
   useEffect(() => {
     if (phase !== "showing" || !result) return;
-    const hold = result.decision === "granted" ? GRANTED_HOLD_MS : DENIED_HOLD_MS;
+    // Message deliveries hold longer (~7s) so the note is actually readable.
+    const hold = result.message
+      ? MESSAGE_HOLD_MS
+      : result.decision === "granted"
+        ? GRANTED_HOLD_MS
+        : DENIED_HOLD_MS;
     const id = window.setTimeout(() => {
       setPhase("idle");
       setResult(null);
@@ -117,7 +163,9 @@ export default function GatePage() {
     if (config.mock) {
       busyRef.current = true;
       try {
-        present(toKioskResult(mockRecognize()));
+        // null = no_face: a silent non-event — the mock plan is mostly these.
+        const kiosk = toKioskResult(mockRecognize());
+        if (kiosk) present(kiosk);
       } finally {
         busyRef.current = false;
       }
@@ -139,7 +187,11 @@ export default function GatePage() {
       const raw = await recognizeFrame(frame, config, controller.signal);
       // The API "denied" path uses door_opened=false; only `granted` opens.
       setConfigError(false);
-      present(toKioskResult(raw));
+      // `no_face` (empty hallway) converts to null: NO overlay, NO red state —
+      // the kiosk stays idle and the capture loop just continues (Smart Gate
+      // rules v2.1). "Visage non reconnu" is reserved for `unknown_face`.
+      const kiosk = toKioskResult(raw);
+      if (kiosk) present(kiosk);
     } catch (err) {
       // A 401/403 means the terminal itself is rejected (bad/missing device
       // key) — a persistent install problem worth surfacing. Anything else
@@ -162,11 +214,10 @@ export default function GatePage() {
   }, [runCapture]);
 
   // --- live SSE feed: react to events for THIS door (Bridge / RTSP cams) ---
-  // Keep latest config/present in refs so the EventSource is opened once.
+  // Keep the latest present in a ref so the EventSource is opened once
+  // (configRef is declared above, next to brandingRef).
   const presentRef = useRef(present);
   presentRef.current = present;
-  const configRef = useRef(config);
-  configRef.current = config;
 
   useEffect(() => {
     // In mock mode there is no API to stream from.

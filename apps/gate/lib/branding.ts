@@ -55,6 +55,10 @@ export function localeTag(locale: Locale): string {
 export interface Strings {
   lookHint: string;
   welcome: (name: string) => string;
+  /** Exit fallback when the server greeting is missing ("Au revoir {name}"). */
+  goodbye: (name: string) => string;
+  /** Label above the one-shot door-side message (the gold card). */
+  messageLabel: string;
   checkIn: string;
   checkOut: string;
   present: string;
@@ -82,6 +86,8 @@ const STRINGS: Record<Locale, Strings> = {
   fr: {
     lookHint: "Regardez la caméra",
     welcome: (name) => `Bienvenue ${name}`,
+    goodbye: (name) => `Au revoir ${name}`,
+    messageLabel: "Message",
     checkIn: "Entrée",
     checkOut: "Sortie",
     present: "Présence enregistrée",
@@ -103,6 +109,8 @@ const STRINGS: Record<Locale, Strings> = {
   en: {
     lookHint: "Look at the camera",
     welcome: (name) => `Welcome ${name}`,
+    goodbye: (name) => `Goodbye ${name}`,
+    messageLabel: "Message",
     checkIn: "Check-in",
     checkOut: "Check-out",
     present: "Attendance recorded",
@@ -123,6 +131,8 @@ const STRINGS: Record<Locale, Strings> = {
   ar: {
     lookHint: "انظر إلى الكاميرا",
     welcome: (name) => `مرحباً ${name}`,
+    goodbye: (name) => `مع السلامة ${name}`,
+    messageLabel: "رسالة",
     checkIn: "دخول",
     checkOut: "خروج",
     present: "تم تسجيل الحضور",
@@ -152,4 +162,21 @@ export function directionLabel(direction: Direction, s: Strings): string {
   if (direction === "in") return s.checkIn;
   // `unknown` direction at a single-door site still represents a presence mark.
   return s.checkIn;
+}
+
+/**
+ * The greeting line the kiosk shows AND speaks for a granted result.
+ * Server greeting is authoritative and rendered verbatim (Smart Gate rules);
+ * when absent (e.g. an SSE AccessEvent, which carries no greeting) fall back
+ * direction-aware so an exit never says "Bienvenue".
+ */
+export function resolveGreeting(
+  greeting: string | undefined,
+  direction: Direction,
+  name: string,
+  s: Strings,
+): string {
+  const g = greeting?.trim();
+  if (g) return g;
+  return direction === "out" ? s.goodbye(name) : s.welcome(name);
 }

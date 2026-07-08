@@ -31,6 +31,8 @@ export type Member = {
   valid_from?: string;
   /** ISO date — outside the window → not_authorized, reason "expired". */
   valid_until?: string;
+  /** One-shot door-side note; delivered + cleared on next granted entry. */
+  kiosk_message?: string;
   status: MemberStatus;
   created_at: string;
 };
@@ -84,12 +86,20 @@ export type AttendanceDay = {
 };
 
 export type RecognizeResult = {
-  decision: AccessDecision;
+  /** `no_face` exists on the wire only — never stored; kiosks stay idle on it. */
+  decision: AccessDecision | "no_face";
   member?: { id: string; full_name: string; department?: string; title?: string };
   similarity?: number;
   door_opened: boolean;
+  /** Localized, direction- and time-aware (see Smart Gate rules). */
   greeting?: string;
   direction: AccessDirection;
+  /** Machine reason for denials: "expired" | "not_yet_valid" | … */
+  reason?: string;
+  /** On exits: localized "8 h 12 sur site aujourd'hui". */
+  day_summary?: string;
+  /** One-shot door-side note left by an operator (see Smart Gate rules). */
+  message?: string;
 };
 
 /** `GET /api/stats/today` */
@@ -206,9 +216,16 @@ export type AttendanceConfig = {
   auto_open_on_grant: boolean;
 };
 
+/** `settings.security` — Smart Gate rules (v2.1). */
+export type SecurityConfig = {
+  /** At most one alert per (door, kind) per this many seconds (default 45). */
+  alert_cooldown_seconds: number;
+};
+
 export type Settings = {
   branding: Branding;
   attendance: AttendanceConfig;
+  security: SecurityConfig;
 };
 
 /** `POST /api/auth/login` */
@@ -327,7 +344,12 @@ export type PresenceNow = {
 // v2 — Alerts (`GET /api/alerts`, SSE `event: alert`)
 // ---------------------------------------------------------------------------
 
-export type AlertKind = "unknown_face" | "not_authorized" | "off_schedule" | "system";
+export type AlertKind =
+  | "unknown_face"
+  | "not_authorized"
+  | "off_schedule"
+  | "anti_passback"
+  | "system";
 export type AlertSeverity = "info" | "warning" | "critical";
 
 export type Alert = {
@@ -351,6 +373,28 @@ export type AlertQuery = {
   acknowledged?: boolean;
   kind?: AlertKind;
   limit?: number;
+};
+
+// ---------------------------------------------------------------------------
+// v2.1 — Insights, "{product} IQ" (`GET /api/insights`, operator+)
+// Local behavioural intelligence — pure SQL/stats on the box, no cloud, no ML.
+// ---------------------------------------------------------------------------
+
+export type InsightKind =
+  | "unusual_arrival" // today ≥60min later than their 30-day median (beyond grace)
+  | "absence_streak" // ≥3 consecutive workdays absent
+  | "punctuality_streak" // ≥10 consecutive on-time days (celebrate it)
+  | "record_presence"; // today's on-site peak is a 30-day high (site-level)
+
+export type Insight = {
+  kind: InsightKind;
+  member_id?: string;
+  member_name?: string;
+  department?: string;
+  /** Ready-to-display FR line, built server-side like alert messages. */
+  text: string;
+  /** ISO date the insight refers to. */
+  date: string;
 };
 
 // ---------------------------------------------------------------------------

@@ -7,8 +7,13 @@
 
 Alerts are **created automatically** by the recognition path for every
 non-granted decision (see :func:`record_decision_alert`, called by the
-recognize router) and can also be system-generated. Operators acknowledge them;
-the actor is taken from the JWT and audited.
+recognize router), for granted double-entries (:func:`record_anti_passback_alert`)
+and can also be system-generated. Operators acknowledge them; the actor is
+taken from the JWT and audited.
+
+**Cooldown** (Smart Gate v2.1): at most one alert per (door, kind) per
+``settings.security.alert_cooldown_seconds`` — a stranger standing at the door
+produces one alert, not one per frame. Events are still logged.
 """
 
 from __future__ import annotations
@@ -21,6 +26,7 @@ from starlette.concurrency import run_in_threadpool
 
 from ..core import audit, db, security
 from ..models.schemas import AckAllResult, Alert, AlertCount, AlertKind
+from . import settings as settings_router
 
 logger = logging.getLogger("attendyo.alerts")
 
@@ -72,33 +78,51 @@ def _row_to_alert(row: dict[str, Any]) -> Alert:
     )
 
 
-def record_decision_alert(
+def _cooldown_active(door_id: Optional[str], kind: str) -> bool:
+    """True when the newest alert with the same (door, kind) is too recent.
+
+    Reads ``settings.security.alert_cooldown_seconds`` (default 45). ``NULL``
+    door ids match each other (``IS NOT DISTINCT FROM``) so door-less kiosks
+    are rate-limited too.
+    """
+    cooldown = int(settings_router.load_security().alert_cooldown_seconds)
+    if cooldown <= 0:
+        return False
+    row = db.query_one(
+        """
+        SELECT 1
+        FROM alerts
+        WHERE kind = %s
+          AND door_id IS NOT DISTINCT FROM %s::uuid
+          AND ts > now() - (%s || ' seconds')::interval
+        LIMIT 1
+        """,
+        (kind, door_id, str(cooldown)),
+    )
+    return row is not None
+
+
+def _insert_alert(
     *,
-    decision: str,
-    reason: Optional[str],
+    kind: str,
+    severity: str,
+    message: str,
     event_id: Optional[int],
     door_id: Optional[str],
     door_name: Optional[str],
     member_id: Optional[str],
     member_name: Optional[str],
 ) -> Optional[dict[str, Any]]:
-    """Insert an alert row for a non-granted decision (sync; call in a thread).
+    """Cooldown-checked alert INSERT (sync; call in a thread).
 
     Returns the contract-shaped ``Alert`` payload (for SSE publication) or
-    ``None`` when the insert failed — alert creation must never break the
-    recognition hot path.
+    ``None`` when skipped by the cooldown or the insert failed — alert creation
+    must never break the recognition hot path.
     """
-    kind = decision if decision in _KIND_MESSAGES else "system"
-    severity = _KIND_SEVERITY.get(kind, "warning")
-    template = _KIND_MESSAGES.get(kind, "Événement de sécurité à {door}")
-    message = template.format(
-        who=member_name or "inconnu",
-        door=door_name or "porte inconnue",
-    )
-    if reason in ("expired", "not_yet_valid"):
-        message += " (accès expiré)" if reason == "expired" else " (accès pas encore valide)"
-
     try:
+        if _cooldown_active(door_id, kind):
+            logger.debug("Alert (%s, %s) suppressed by cooldown", door_id, kind)
+            return None
         row = db.execute_returning(
             """
             INSERT INTO alerts (kind, severity, message, event_id, door_id, member_id)
@@ -108,7 +132,7 @@ def record_decision_alert(
             (kind, severity, message, event_id, door_id, member_id),
         )
     except Exception as exc:  # pragma: no cover - hot path must not break
-        logger.warning("Could not record alert for decision %s: %s", decision, exc)
+        logger.warning("Could not record %s alert: %s", kind, exc)
         return None
     assert row is not None
     return {
@@ -124,6 +148,72 @@ def record_decision_alert(
         "member_name": member_name,
         "acknowledged": False,
     }
+
+
+def record_decision_alert(
+    *,
+    decision: str,
+    reason: Optional[str],
+    event_id: Optional[int],
+    door_id: Optional[str],
+    door_name: Optional[str],
+    member_id: Optional[str],
+    member_name: Optional[str],
+) -> Optional[dict[str, Any]]:
+    """Insert an alert row for a non-granted decision (sync; call in a thread).
+
+    Subject to the per-(door, kind) cooldown. Returns the ``Alert`` payload for
+    SSE publication, or ``None`` when suppressed/failed.
+    """
+    kind = decision if decision in _KIND_MESSAGES else "system"
+    severity = _KIND_SEVERITY.get(kind, "warning")
+    template = _KIND_MESSAGES.get(kind, "Événement de sécurité à {door}")
+    message = template.format(
+        who=member_name or "inconnu",
+        door=door_name or "porte inconnue",
+    )
+    if reason in ("expired", "not_yet_valid"):
+        message += " (accès expiré)" if reason == "expired" else " (accès pas encore valide)"
+
+    return _insert_alert(
+        kind=kind,
+        severity=severity,
+        message=message,
+        event_id=event_id,
+        door_id=door_id,
+        door_name=door_name,
+        member_id=member_id,
+        member_name=member_name,
+    )
+
+
+def record_anti_passback_alert(
+    *,
+    event_id: Optional[int],
+    door_id: Optional[str],
+    door_name: Optional[str],
+    member_id: Optional[str],
+    member_name: Optional[str],
+) -> Optional[dict[str, Any]]:
+    """Soft anti-passback: granted double-entry at an explicitly-"in" door.
+
+    The door still opened; this only records an informational alert (subject to
+    the same per-(door, kind) cooldown). Sync; call in a thread.
+    """
+    message = "Double entrée : {name} — {door} (déjà sur site)".format(
+        name=member_name or "inconnu",
+        door=door_name or "porte inconnue",
+    )
+    return _insert_alert(
+        kind="anti_passback",
+        severity="info",
+        message=message,
+        event_id=event_id,
+        door_id=door_id,
+        door_name=door_name,
+        member_id=member_id,
+        member_name=member_name,
+    )
 
 
 @router.get("", response_model=list[Alert])

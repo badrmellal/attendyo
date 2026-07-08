@@ -17,6 +17,7 @@ import {
   CheckCheck,
   DoorOpen,
   Loader2,
+  Repeat2,
   ShieldAlert,
   ShieldQuestion,
   Clock3,
@@ -35,6 +36,7 @@ const KIND_META: Record<AlertKind, { label: string; icon: LucideIcon; tone: "dan
   unknown_face: { label: "Visage inconnu", icon: ShieldQuestion, tone: "danger" },
   not_authorized: { label: "Non autorisé", icon: ShieldAlert, tone: "warn" },
   off_schedule: { label: "Hors horaire", icon: Clock3, tone: "warn" },
+  anti_passback: { label: "Double entrée", icon: Repeat2, tone: "info" },
   system: { label: "Système", icon: Cog, tone: "info" },
 };
 
@@ -236,7 +238,9 @@ export default function AlertsPage() {
                     ? "border-border/60 bg-surface/50"
                     : alert.severity === "critical"
                       ? "border-danger/30 bg-danger/[0.05]"
-                      : "border-accent/30 bg-accent/[0.05]",
+                      : alert.severity === "info"
+                        ? "border-info/30 bg-info/[0.05]"
+                        : "border-accent/30 bg-accent/[0.05]",
                 )}
               >
                 <span

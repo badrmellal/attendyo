@@ -38,11 +38,34 @@ class EngineUnavailable(EngineError):
 
 
 class EngineRejected(EngineError):
-    """The engine was reached but rejected the request (e.g. no face detected)."""
+    """The engine was reached but rejected the request (bad image, etc.)."""
 
     def __init__(self, message: str, status_code: int | None = None) -> None:
         super().__init__(message)
         self.status_code = status_code
+
+
+class EngineNoFace(EngineError):
+    """The engine analysed the frame and found **no face at all**.
+
+    A normal, expected outcome for an empty hallway / blur / someone walking
+    past — surfaced distinctly so the recognize route can treat it as a silent
+    non-event (contract: ``no_face``), never as an unknown face.
+    """
+
+
+# CompreFace-lineage "no face" signature: HTTP 400 with error code 28 and/or a
+# message containing "No face is found".
+_NO_FACE_CODE = 28
+
+
+def _is_no_face_body(body: Any) -> bool:
+    if not isinstance(body, dict):
+        return False
+    if body.get("code") == _NO_FACE_CODE:
+        return True
+    message = body.get("message") or body.get("msg") or ""
+    return "no face" in str(message).lower()
 
 
 @dataclass(slots=True)
@@ -90,9 +113,10 @@ def recognize(
 ) -> RecognitionResult:
     """Recognize the most prominent face in ``image_bytes``.
 
-    Returns a :class:`RecognitionResult`. When no face is detected the result has
-    ``face_detected=False`` and no subject. Raises :class:`EngineUnavailable`
-    only when the engine is unreachable.
+    Returns a :class:`RecognitionResult`. Raises :class:`EngineNoFace` when the
+    engine finds no face at all in the frame (a normal outcome, surfaced
+    distinctly per the Smart Gate rules), :class:`EngineUnavailable` when the
+    engine is unreachable, and :class:`EngineRejected` for any other refusal.
     """
     url = f"{_base_url()}/api/v1/recognition/recognize"
     params: dict[str, Any] = {"limit": limit, "prediction_count": prediction_count}
@@ -107,10 +131,20 @@ def recognize(
         logger.warning("Engine recognize unreachable: %s", exc)
         raise EngineUnavailable(str(exc)) from exc
 
-    # 400 typically means "No face found" — a normal outcome, not an error.
+    # 400 with the "no face" signature (code 28 / "No face is found") is a
+    # normal outcome — surface it distinctly, never as a generic rejection.
     if resp.status_code == 400:
-        logger.debug("Engine: no face detected (400)")
-        return RecognitionResult(face_detected=False)
+        try:
+            body = resp.json()
+        except ValueError:
+            body = None
+        if body is None or _is_no_face_body(body):
+            logger.debug("Engine: no face detected (400)")
+            raise EngineNoFace("No face is found in the frame")
+        raise EngineRejected(
+            _extract_message(resp) or f"recognize failed: {resp.text[:200]}",
+            status_code=400,
+        )
     if resp.status_code >= 500:
         raise EngineUnavailable(f"engine {resp.status_code}")
     if resp.status_code != 200:
@@ -121,7 +155,8 @@ def recognize(
     data = resp.json()
     results = data.get("result") or []
     if not results:
-        return RecognitionResult(face_detected=False)
+        # Defensive: a 200 with an empty result set is still "no face in frame".
+        raise EngineNoFace("No face is found in the frame")
 
     # Pick the largest face by bounding-box area (most prominent subject).
     def _area(face: dict[str, Any]) -> float:

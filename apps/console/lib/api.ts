@@ -25,6 +25,7 @@ import type {
   HealthStatus,
   ImportError,
   ImportResult,
+  Insight,
   LoginResponse,
   Member,
   MemberDraft,
@@ -67,6 +68,7 @@ import {
   getMockSettings,
   getMockUsers,
   mockId,
+  mockInsights,
   mockPresenceNow,
   mockReportsDepartments,
   mockReportsMembers,
@@ -337,6 +339,8 @@ export async function updateMember(id: string, patch: MemberPatch): Promise<Memb
         };
         if (!("valid_from" in patch)) delete normalized.valid_from;
         if (!("valid_until" in patch)) delete normalized.valid_until;
+        // Saving an empty door-side message clears it (contract: one-shot note).
+        if (normalized.kiosk_message === "") normalized.kiosk_message = undefined;
         return updateMockMember(id, normalized);
       } catch {
         throw new ApiError(404, "Member not found");
@@ -858,6 +862,20 @@ export function memberReportToCSV(rows: MemberReport[]): string {
       .join(","),
   );
   return [header.join(","), ...lines].join("\n");
+}
+
+// --------------------------------------------------------------------------
+// Insights — "{product} IQ" (`GET /api/insights`, operator+). Deterministic,
+// computed locally from attendance history; nothing stored, nothing cloud.
+// --------------------------------------------------------------------------
+export async function getInsights(limit = 10): Promise<Insight[]> {
+  return withMock(
+    () =>
+      request<{ insights: Insight[] }>(`/api/insights?limit=${limit}`).then(
+        (r) => r.insights,
+      ),
+    () => mockInsights(limit),
+  );
 }
 
 // --------------------------------------------------------------------------

@@ -51,6 +51,63 @@ def _site_for_door(door_id: Optional[str]) -> Optional[dict[str, Any]]:
     )
 
 
+def grant_context(member_id: str, door_id: Optional[str]) -> dict[str, Any]:
+    """Site-local context for one granted recognition (sync; call in a thread).
+
+    Returns ``{"tz_name", "local_now", "work_date", "on_site"}``. ``on_site``
+    is a **toggle on the member's most recent granted event today**: last
+    effective direction was an entry (``in`` — or legacy ``unknown``, which
+    only pre-v2.1 events carry) ⇒ inside; ``out`` ⇒ outside; no event today ⇒
+    outside. This is what direction inference needs (both/no door → on-site ⇒
+    "out" else "in"): unlike the first-in/last-out attendance pair, it keeps
+    alternating correctly across midday exits and re-entries — the pair-based
+    notion goes permanently "off-site" after the first exit of the day, which
+    made the kiosk greet a real exit with "Bienvenue" again. Also used for
+    time-aware greetings and the soft anti-passback check.
+    """
+    site = _site_for_door(door_id)
+    tz_name = (site or {}).get("timezone") or "Africa/Casablanca"
+    try:
+        from zoneinfo import ZoneInfo
+
+        local_now = dt.datetime.now(ZoneInfo(tz_name))
+    except Exception:  # pragma: no cover - bad tz name in DB
+        local_now = dt.datetime.now()
+    work_date = local_now.date()
+
+    last = db.query_one(
+        """
+        SELECT direction
+        FROM access_events
+        WHERE member_id = %s
+          AND decision = 'granted'
+          AND ts >= %s::date
+        ORDER BY ts DESC
+        LIMIT 1
+        """,
+        (member_id, work_date),
+    )
+    return {
+        "tz_name": tz_name,
+        "local_now": local_now,
+        "work_date": work_date,
+        "on_site": last is not None and (last.get("direction") or "unknown") != "out",
+    }
+
+
+def today_row(member_id: str, work_date: dt.date) -> Optional[dict[str, Any]]:
+    """Fetch the member's attendance row for ``work_date`` (sync)."""
+    return db.query_one(
+        """
+        SELECT member_id, work_date, first_in_ts, last_out_ts, worked_seconds,
+               is_late, status
+        FROM attendance_days
+        WHERE member_id = %s AND work_date = %s
+        """,
+        (member_id, work_date),
+    )
+
+
 def record_granted_event(
     *,
     member_id: str,

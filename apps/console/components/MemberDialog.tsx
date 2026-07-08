@@ -35,6 +35,7 @@ type Form = {
   access_group_id: string;
   valid_from: string;
   valid_until: string;
+  kiosk_message: string;
   status: MemberStatus;
 };
 
@@ -50,6 +51,7 @@ function toForm(m: Member): Form {
     access_group_id: m.access_group_id ?? "",
     valid_from: m.valid_from ?? "",
     valid_until: m.valid_until ?? "",
+    kiosk_message: m.kiosk_message ?? "",
     status: m.status,
   };
 }
@@ -109,6 +111,8 @@ export function MemberDialog({
         // Explicit null CLEARS a previously-set bound (contract PATCH semantics).
         valid_from: form.valid_from || null,
         valid_until: form.valid_until || null,
+        // One-shot door-side note — empty string clears a pending message.
+        kiosk_message: form.kiosk_message.trim(),
         status: form.status,
       });
       onSaved(saved);
@@ -257,6 +261,20 @@ export function MemberDialog({
               </option>
             ))}
           </select>
+        </FormField>
+
+        <FormField
+          label="Message d'accueil (optionnel)"
+          hint="Affiché et lu à la porte à sa prochaine entrée, une seule fois. Vide = aucun message."
+        >
+          <textarea
+            className="field w-full resize-none px-3 py-2 text-sm"
+            rows={2}
+            maxLength={140}
+            value={form.kiosk_message}
+            onChange={(e) => set("kiosk_message", e.target.value)}
+            placeholder="ex. Réunion déplacée à 14 h — salle B"
+          />
         </FormField>
 
         {/* Temporary-access window (visitors, contractors, exchange students) */}

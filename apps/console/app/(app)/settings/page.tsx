@@ -11,6 +11,7 @@ import {
   Save,
   RotateCcw,
   Palette,
+  ShieldCheck,
   SlidersHorizontal,
   Check,
   Loader2,
@@ -43,10 +44,12 @@ export default function SettingsPage() {
   useEffect(() => {
     getSettings()
       .then((s) => {
-        // Older backends may not send the v2 terminology preset yet.
+        // Older backends may not send the v2 terminology preset or the v2.1
+        // security block yet — normalize to the contract defaults.
         const normalized: Settings = {
           ...s,
           branding: { ...s.branding, terminology: s.branding.terminology ?? "workforce" },
+          security: s.security ?? { alert_cooldown_seconds: 45 },
         };
         setSettings(normalized);
         setDraft(normalized);
@@ -79,6 +82,11 @@ export default function SettingsPage() {
 
   function patchAttendance(patch: Partial<Settings["attendance"]>) {
     setDraft((d) => (d ? { ...d, attendance: { ...d.attendance, ...patch } } : d));
+    setSaved(false);
+  }
+
+  function patchSecurity(patch: Partial<Settings["security"]>) {
+    setDraft((d) => (d ? { ...d, security: { ...d.security, ...patch } } : d));
     setSaved(false);
   }
 
@@ -308,6 +316,40 @@ export default function SettingsPage() {
                 onChange={(v) => patchAttendance({ auto_open_on_grant: v })}
               />
             </label>
+          </section>
+
+          {/* Security config (v2.1 Smart Gate) */}
+          <section className="card p-6">
+            <div className="mb-5 flex items-center gap-2.5">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-info/10 text-info ring-1 ring-info/20">
+                <ShieldCheck className="h-4 w-4" />
+              </span>
+              <div>
+                <h3 className="font-display font-semibold text-text">Sécurité</h3>
+                <p className="text-xs text-text-muted">Anti-bruit des alertes à la porte</p>
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Délai entre alertes (s)">
+                <input
+                  type="number"
+                  min={0}
+                  className="field w-full px-3 py-2 text-sm tnum"
+                  value={draft.security.alert_cooldown_seconds}
+                  onChange={(e) =>
+                    patchSecurity({
+                      alert_cooldown_seconds: Math.max(0, Number(e.target.value) || 0),
+                    })
+                  }
+                />
+              </Field>
+            </div>
+            <p className="mt-2 text-xs text-text-muted/80">
+              Au plus une alerte par porte et par type pendant ce délai — un inconnu qui
+              reste devant la porte ne génère qu'une seule alerte, pas une par image. Les
+              événements restent tous journalisés.
+            </p>
           </section>
         </div>
 

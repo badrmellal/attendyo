@@ -6,6 +6,7 @@ import {
   directionLabel,
   getStrings,
   localeTag,
+  resolveGreeting,
   type Strings,
 } from "@/lib/branding";
 import { cn } from "@/lib/cn";
@@ -45,8 +46,10 @@ function denialMessage(result: KioskResult, s: Strings): string {
 
 /**
  * The recognition result overlay. GRANTED is the signature celebratory state
- * ("Bienvenue {name}", title/department, check-in/out + time). Denied states
- * are a calm single red shake with a short reason — no alarm theatrics.
+ * ("Bienvenue {name}" on entry, "Au revoir {name}" + Sortie chip + day summary
+ * on exit, plus the gold one-shot message card when an operator left a note).
+ * Denied states are a calm single red shake with a short reason — no alarm
+ * theatrics. `no_face` never reaches this component (silent non-event).
  *
  * All copy is localized via branding.locale; the container flips to RTL for ar.
  */
@@ -64,10 +67,15 @@ export function RecognitionOverlay({
 
   if (granted) {
     const name = result.member?.full_name ?? "";
-    const greeting = result.greeting?.trim() || s.welcome(name);
+    // Server greeting verbatim; direction-aware fallback so an exit without a
+    // server greeting (e.g. SSE AccessEvent) still says goodbye, not welcome.
+    const greeting = resolveGreeting(result.greeting, result.direction, name, s);
     const subtitle = [result.member?.title, result.member?.department]
       .filter(Boolean)
       .join(" · ");
+    // Exits carry day_summary; it takes the muted secondary slot (Smart Gate
+    // rules): name line first, then the on-site total for today.
+    const secondary = result.daySummary?.trim() || subtitle;
 
     return (
       <div className="animate-fade-in flex flex-col items-center text-center">
@@ -89,13 +97,30 @@ export function RecognitionOverlay({
           {greeting}
         </h1>
 
-        {subtitle && (
+        {secondary && (
           <p
             className="animate-rise-in mt-3 text-[clamp(1rem,2.6vw,1.5rem)] font-medium text-text-muted"
             style={{ animationDelay: "60ms" }}
           >
-            {subtitle}
+            {secondary}
           </p>
+        )}
+
+        {/* One-shot door-side message: a distinct gold card (accent border +
+            tint), text sized to be read at ~2m. The hold time is extended for
+            message results so it can actually be read. */}
+        {result.message && (
+          <div
+            className="animate-rise-in mt-6 w-full max-w-xl rounded-2xl border border-accent/40 bg-accent/10 px-7 py-5"
+            style={{ animationDelay: "100ms" }}
+          >
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-accent">
+              {s.messageLabel}
+            </p>
+            <p className="mt-1.5 text-[clamp(1.15rem,3.2vw,1.8rem)] font-medium leading-snug text-text">
+              {result.message}
+            </p>
+          </div>
         )}
 
         <div

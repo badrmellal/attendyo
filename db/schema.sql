@@ -93,6 +93,8 @@ CREATE TABLE IF NOT EXISTS members (
     -- NULL = no bound on that side. Outside the window → not_authorized ("expired").
     valid_from      DATE,
     valid_until     DATE,
+    -- One-shot door-side message: delivered on next granted entry, then cleared.
+    kiosk_message   TEXT,
     status          TEXT NOT NULL DEFAULT 'active'
                         CHECK (status IN ('active','suspended','archived')),
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -176,7 +178,7 @@ CREATE TABLE IF NOT EXISTS alerts (
     id              BIGSERIAL PRIMARY KEY,
     ts              TIMESTAMPTZ NOT NULL DEFAULT now(),
     kind            TEXT NOT NULL
-                        CHECK (kind IN ('unknown_face','not_authorized','off_schedule','system')),
+                        CHECK (kind IN ('unknown_face','not_authorized','off_schedule','anti_passback','system')),
     severity        TEXT NOT NULL DEFAULT 'warning'
                         CHECK (severity IN ('info','warning','critical')),
     message         TEXT NOT NULL,
@@ -227,5 +229,11 @@ INSERT INTO settings (key, value) VALUES
         "in_out_strategy": "first_in_last_out",
         "min_revisit_seconds": 60,
         "auto_open_on_grant": true
+    }'::jsonb)
+ON CONFLICT (key) DO NOTHING;
+
+INSERT INTO settings (key, value) VALUES
+    ('security', '{
+        "alert_cooldown_seconds": 45
     }'::jsonb)
 ON CONFLICT (key) DO NOTHING;

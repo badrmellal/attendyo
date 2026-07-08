@@ -21,9 +21,16 @@ MemberType = Literal[
 MemberStatus = Literal["active", "suspended", "archived"]
 Direction = Literal["in", "out", "unknown"]
 Decision = Literal["granted", "denied", "unknown_face", "not_authorized", "off_schedule"]
+# Wire-only superset for the recognize endpoint: "no_face" is never stored — the
+# access_events enum stays exactly ``Decision`` (contract: Smart Gate rules v2.1).
+RecognizeDecision = Literal[
+    "granted", "denied", "unknown_face", "not_authorized", "off_schedule", "no_face"
+]
 AttendanceStatus = Literal["present", "late", "absent", "incomplete"]
 UserRole = Literal["admin", "operator", "viewer"]
-AlertKind = Literal["unknown_face", "not_authorized", "off_schedule", "system"]
+AlertKind = Literal[
+    "unknown_face", "not_authorized", "off_schedule", "anti_passback", "system"
+]
 AlertSeverity = Literal["info", "warning", "critical"]
 Terminology = Literal["workforce", "campus", "residence"]
 
@@ -89,6 +96,8 @@ class Member(BaseModel):
     photo_url: Optional[str] = None
     valid_from: Optional[date] = None
     valid_until: Optional[date] = None
+    # One-shot door-side note; delivered + cleared on next granted entry.
+    kiosk_message: Optional[str] = None
     status: MemberStatus
     created_at: datetime
 
@@ -106,6 +115,9 @@ class MemberUpdate(BaseModel):
     access_group_id: Optional[str] = None
     valid_from: Optional[date] = None
     valid_until: Optional[date] = None
+    # Operator-set one-shot door-side message ("Message d'accueil"). PATCHing it
+    # to null clears an undelivered note.
+    kiosk_message: Optional[str] = None
     status: Optional[MemberStatus] = None
 
 
@@ -172,14 +184,20 @@ class RecognizeMember(BaseModel):
 
 
 class RecognizeResult(BaseModel):
-    """Matches contract ``RecognizeResult``."""
+    """Matches contract ``RecognizeResult`` (incl. Smart Gate v2.1 fields)."""
 
-    decision: Decision
+    decision: RecognizeDecision
     member: Optional[RecognizeMember] = None
     similarity: Optional[float] = None
     door_opened: bool = False
     greeting: Optional[str] = None
     direction: Direction = "unknown"
+    # Machine reason for denials: "expired" | "not_yet_valid" | …
+    reason: Optional[str] = None
+    # On exits: localized "8 h 12 sur site aujourd'hui".
+    day_summary: Optional[str] = None
+    # One-shot door-side note left by an operator (delivered once, then cleared).
+    message: Optional[str] = None
 
 
 # --------------------------------------------------------------------------- #
@@ -313,16 +331,25 @@ class AttendanceSettings(BaseModel):
     auto_open_on_grant: bool = True
 
 
+class SecuritySettings(BaseModel):
+    """Contract ``settings.security`` (Smart Gate v2.1)."""
+
+    # At most one alert per (door, kind) within this window; default per contract.
+    alert_cooldown_seconds: int = 45
+
+
 class SettingsOut(BaseModel):
     branding: Branding
     attendance: AttendanceSettings
+    security: SecuritySettings
 
 
 class SettingsUpdate(BaseModel):
-    """PUT body. Either section may be supplied; omitted sections are unchanged."""
+    """PUT body. Any section may be supplied; omitted sections are unchanged."""
 
     branding: Optional[Branding] = None
     attendance: Optional[AttendanceSettings] = None
+    security: Optional[SecuritySettings] = None
 
 
 # --------------------------------------------------------------------------- #
@@ -423,6 +450,31 @@ class MemberReport(BaseModel):
     absent_days: int
     avg_arrival: Optional[str] = None  # "HH:MM" local, or null if never arrived
     total_worked_seconds: int
+
+
+# --------------------------------------------------------------------------- #
+# Insights — "{product} IQ" (v2.1)
+# --------------------------------------------------------------------------- #
+InsightKind = Literal[
+    "unusual_arrival", "absence_streak", "punctuality_streak", "record_presence"
+]
+
+
+class Insight(BaseModel):
+    """Matches contract ``Insight`` (Smart Gate v2.1). Nothing is stored."""
+
+    kind: InsightKind
+    member_id: Optional[str] = None
+    member_name: Optional[str] = None
+    department: Optional[str] = None
+    text: str  # ready-to-display FR line, built server-side like alert messages
+    date: date  # ISO date the insight refers to
+
+
+class InsightsOut(BaseModel):
+    """``GET /api/insights`` response envelope."""
+
+    insights: list[Insight] = Field(default_factory=list)
 
 
 # --------------------------------------------------------------------------- #
