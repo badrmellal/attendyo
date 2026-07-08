@@ -101,7 +101,7 @@ export function TopBar({ title, onOpenSidebar }: { title: string; onOpenSidebar?
         {isMockForced() && (
           <span className="hidden items-center gap-1.5 rounded-full border border-accent/25 bg-accent/10 px-2.5 py-1 text-xs font-medium text-accent sm:inline-flex">
             <FlaskConical className="h-3.5 w-3.5" />
-            Demo data
+            {t("common.demoData")}
           </span>
         )}
 
@@ -115,18 +115,22 @@ export function TopBar({ title, onOpenSidebar }: { title: string; onOpenSidebar?
           )}
           title={
             health
-              ? `Moteur de vision: ${health.engine} · Base de données: ${health.db}`
-              : "Engine unreachable"
+              ? t("health.tip", { engine: health.engine, db: health.db })
+              : t("health.unreachable")
           }
         >
           {healthy ? <Wifi className="h-3.5 w-3.5" /> : <WifiOff className="h-3.5 w-3.5" />}
-          {healthy ? "Engine online" : "Engine offline"}
+          {healthy ? t("health.online") : t("health.offline")}
         </span>
 
         {/* Alerts bell — unacknowledged count, links to /alerts */}
         <Link
           href="/alerts"
-          aria-label={`Alertes${unackAlerts > 0 ? ` — ${unackAlerts} non acquittée(s)` : ""}`}
+          aria-label={
+            unackAlerts > 0
+              ? `${t("nav.alerts")} — ${t("alerts.subtitle.some", { n: unackAlerts })}`
+              : t("nav.alerts")
+          }
           className="relative flex h-9 w-9 items-center justify-center rounded-lg border border-border text-text-muted transition-colors hover:border-text-muted/40 hover:text-text"
         >
           <Bell className="h-4.5 w-4.5" size={18} />
@@ -146,9 +150,9 @@ export function TopBar({ title, onOpenSidebar }: { title: string; onOpenSidebar?
             onClick={() => setMenuOpen((o) => !o)}
             className="flex items-center gap-2 rounded-lg border border-border bg-surface-2/50 py-1 pl-1 pr-2 transition-colors hover:border-text-muted/40"
           >
-            <Avatar name={user?.full_name || user?.email || "Operator"} size={28} />
+            <Avatar name={user?.full_name || user?.email || t("topbar.operator")} size={28} />
             <span className="hidden max-w-[120px] truncate text-sm font-medium text-text sm:block">
-              {user?.full_name || user?.email || "Operator"}
+              {user?.full_name || user?.email || t("topbar.operator")}
             </span>
             <ChevronDown className="h-4 w-4 text-text-muted" />
           </button>
@@ -157,7 +161,7 @@ export function TopBar({ title, onOpenSidebar }: { title: string; onOpenSidebar?
             <div className="absolute right-0 mt-2 w-52 origin-top-right animate-scale-in rounded-xl border border-border bg-surface p-1.5 shadow-pop">
               <div className="px-3 py-2">
                 <p className="truncate text-sm font-medium text-text">
-                  {user?.full_name || "Operator"}
+                  {user?.full_name || t("topbar.operator")}
                 </p>
                 <p className="truncate text-xs text-text-muted">{user?.email}</p>
               </div>

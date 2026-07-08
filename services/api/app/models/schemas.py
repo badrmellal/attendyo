@@ -8,7 +8,7 @@ ISO-8601 strings (Pydantic default), matching the ``string`` types in the contra
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -217,6 +217,9 @@ class Door(BaseModel):
     driver_config: dict = Field(default_factory=dict)
     relock_seconds: int
     enabled: bool
+    # v3: the zone this door belongs to (camera→door→zone location chain). Null
+    # when the door is not yet assigned to a zone.
+    zone_id: Optional[str] = None
     created_at: datetime
 
 
@@ -229,6 +232,7 @@ class DoorCreate(BaseModel):
     driver_config: dict = Field(default_factory=dict)
     relock_seconds: int = 5
     enabled: bool = True
+    zone_id: Optional[str] = None
 
 
 class DoorUpdate(BaseModel):
@@ -240,6 +244,7 @@ class DoorUpdate(BaseModel):
     driver_config: Optional[dict] = None
     relock_seconds: Optional[int] = None
     enabled: Optional[bool] = None
+    zone_id: Optional[str] = None
 
 
 class Camera(BaseModel):
@@ -487,6 +492,10 @@ class PresencePerson(BaseModel):
     member_type: MemberType
     first_in_ts: datetime
     first_in_door_name: Optional[str] = None
+    # v3: current zone = zone of the door of the member's most recent granted
+    # event today (null when that door has no zone / entered at a zone-less door).
+    zone_id: Optional[str] = None
+    zone_name: Optional[str] = None
 
 
 class PresenceNow(BaseModel):
@@ -494,3 +503,141 @@ class PresenceNow(BaseModel):
 
     count: int
     people: list[PresencePerson] = Field(default_factory=list)
+
+
+# --------------------------------------------------------------------------- #
+# v3 — Spatial Intelligence: zones, movement, ask, energy
+# --------------------------------------------------------------------------- #
+ZoneKind = Literal["building", "floor", "area"]
+
+
+class Zone(BaseModel):
+    """Matches contract ``Zone`` (building / floor / area, tree via parent_id)."""
+
+    id: str
+    name: str
+    kind: ZoneKind
+    parent_id: Optional[str] = None
+    capacity: Optional[int] = None
+    energy_kw: Optional[float] = None
+    created_at: datetime
+
+
+class ZoneCreate(BaseModel):
+    name: str
+    kind: ZoneKind = "area"
+    parent_id: Optional[str] = None
+    capacity: Optional[int] = None
+    energy_kw: Optional[float] = None
+
+
+class ZoneUpdate(BaseModel):
+    name: Optional[str] = None
+    kind: Optional[ZoneKind] = None
+    parent_id: Optional[str] = None
+    capacity: Optional[int] = None
+    energy_kw: Optional[float] = None
+
+
+class ZoneOccupancy(BaseModel):
+    """One row of ``GET /api/zones/occupancy`` (counts roll children into parents)."""
+
+    zone_id: str
+    name: str
+    kind: ZoneKind
+    parent_id: Optional[str] = None
+    count: int
+    capacity: Optional[int] = None
+    # Granted entries into the zone (or its subtree) in the last 15 minutes.
+    congestion: int
+
+
+# ---- Movement (door-crossing timeline) ------------------------------------- #
+class TimelineStep(BaseModel):
+    ts: datetime
+    door_name: Optional[str] = None
+    zone_name: Optional[str] = None
+    direction: Direction
+    decision: Decision
+
+
+class MemberTimeline(BaseModel):
+    """``GET /api/members/{id}/timeline`` — a member's door crossings for a day."""
+
+    member: Member
+    date: date
+    steps: list[TimelineStep] = Field(default_factory=list)
+
+
+# ---- Ask (deterministic local intent parser) ------------------------------- #
+class AskRequest(BaseModel):
+    q: str
+
+
+class AskResult(BaseModel):
+    """``POST /api/ask`` — a table or text answer built entirely on the box."""
+
+    intent: str
+    title: str
+    columns: Optional[list[str]] = None
+    # (string|number)[][] — values are pre-formatted server-side.
+    rows: Optional[list[list[Any]]] = None
+    text: Optional[str] = None
+    suggestions: Optional[list[str]] = None
+
+
+# ---- Energy rules (occupancy-driven automation) ---------------------------- #
+EnergyDriverName = Literal["webhook", "simulation"]
+EnergyState = Literal["on", "off"]
+
+
+class EnergyRule(BaseModel):
+    """Matches contract ``EnergyRule``."""
+
+    id: str
+    zone_id: str
+    name: str
+    empty_minutes: int
+    driver: EnergyDriverName
+    driver_config: dict = Field(default_factory=dict)
+    enabled: bool
+    state: EnergyState
+    last_changed: Optional[datetime] = None
+    created_at: datetime
+
+
+class EnergyRuleCreate(BaseModel):
+    zone_id: str
+    name: str
+    empty_minutes: int = 15
+    driver: EnergyDriverName = "simulation"
+    driver_config: dict = Field(default_factory=dict)
+    enabled: bool = True
+
+
+class EnergyRuleUpdate(BaseModel):
+    zone_id: Optional[str] = None
+    name: Optional[str] = None
+    empty_minutes: Optional[int] = None
+    driver: Optional[EnergyDriverName] = None
+    driver_config: Optional[dict] = None
+    enabled: Optional[bool] = None
+
+
+class EnergyRuleSummary(BaseModel):
+    rule_id: str
+    name: str
+    zone_name: Optional[str] = None
+    state: EnergyState
+    hours_off: float
+    kwh_saved: float
+
+
+class EnergySummary(BaseModel):
+    """``GET /api/energy/summary`` — savings tally over a period."""
+
+    rules: int
+    off_now: int
+    hours_off: float
+    kwh_saved: float
+    per_rule: list[EnergyRuleSummary] = Field(default_factory=list)

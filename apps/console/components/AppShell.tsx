@@ -23,6 +23,7 @@ function titleKeyForPath(pathname: string): string {
   if (pathname.startsWith("/presence")) return "nav.presence";
   if (pathname.startsWith("/alerts")) return "nav.alerts";
   if (pathname.startsWith("/monitor")) return "nav.monitor";
+  if (pathname.startsWith("/map")) return "nav.map";
   if (pathname.startsWith("/doors")) return "nav.doors";
   if (pathname.startsWith("/groups")) return "nav.groups";
   if (pathname.startsWith("/team")) return "nav.team";

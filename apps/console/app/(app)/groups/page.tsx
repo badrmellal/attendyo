@@ -13,22 +13,15 @@ import { AccessGroupDialog } from "@/components/AccessGroupDialog";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { RowMenu, type RowAction } from "@/components/RowMenu";
+import { useBranding } from "@/components/BrandingProvider";
 import { deleteAccessGroup, listAccessGroups, listDoors, listMembers } from "@/lib/api";
 import type { AccessGroup, Door, Member, ScheduleDay } from "@/lib/types";
-
-const DAY_SHORT: Record<ScheduleDay, string> = {
-  mon: "Lun",
-  tue: "Mar",
-  wed: "Mer",
-  thu: "Jeu",
-  fri: "Ven",
-  sat: "Sam",
-  sun: "Dim",
-};
+import { formatNumber } from "@/lib/utils";
 
 const DAY_ORDER: ScheduleDay[] = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 
 export default function GroupsPage() {
+  const { t, branding } = useBranding();
   const [groups, setGroups] = useState<AccessGroup[]>([]);
   const [doors, setDoors] = useState<Door[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
@@ -56,8 +49,8 @@ export default function GroupsPage() {
 
   const doorName = useMemo(() => {
     const map = new Map(doors.map((d) => [d.id, d.name]));
-    return (id: string) => map.get(id) ?? "Porte supprimée";
-  }, [doors]);
+    return (id: string) => map.get(id) ?? t("groups.doorDeleted");
+  }, [doors, t]);
 
   const memberCount = useMemo(() => {
     const counts = new Map<string, number>();
@@ -94,11 +87,10 @@ export default function GroupsPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="font-display text-xl font-semibold tracking-tight text-text">
-            Groupes d&apos;accès
+            {t("groups.title")}
           </h2>
-          <p className="text-sm text-text-muted">
-            <span className="tnum font-medium text-text">{groups.length}</span> groupe(s) —
-            portes autorisées et fenêtres horaires.
+          <p className="text-sm text-text-muted tnum">
+            {t("groups.count", { n: formatNumber(groups.length, branding.locale) })}
           </p>
         </div>
         <button
@@ -107,7 +99,7 @@ export default function GroupsPage() {
           className="btn-primary inline-flex items-center justify-center gap-2 px-4 py-2 text-sm"
         >
           <Plus className="h-4 w-4" />
-          Nouveau groupe
+          {t("groups.new")}
         </button>
       </div>
 
@@ -126,15 +118,15 @@ export default function GroupsPage() {
         <div className="card">
           <EmptyState
             icon={KeyRound}
-            title="Aucun groupe d'accès"
-            description="Créez un groupe pour restreindre certaines portes ou certains horaires."
+            title={t("groups.empty.title")}
+            description={t("groups.empty.desc")}
             action={
               <button
                 type="button"
                 onClick={() => setDialog({ open: true, group: null })}
                 className="btn-primary inline-flex items-center gap-2 px-4 py-2 text-sm"
               >
-                <Plus className="h-4 w-4" /> Nouveau groupe
+                <Plus className="h-4 w-4" /> {t("groups.new")}
               </button>
             }
           />
@@ -146,12 +138,12 @@ export default function GroupsPage() {
             const always = scheduleDays.length === 0;
             const actions: RowAction[] = [
               {
-                label: "Modifier",
+                label: t("common.edit"),
                 icon: Pencil,
                 onSelect: () => setDialog({ open: true, group }),
               },
               {
-                label: "Supprimer",
+                label: t("common.delete"),
                 icon: Trash2,
                 tone: "danger",
                 onSelect: () => setDeleting(group),
@@ -168,22 +160,26 @@ export default function GroupsPage() {
                       <h3 className="font-display font-semibold text-text">{group.name}</h3>
                       <p className="flex items-center gap-1 text-xs text-text-muted">
                         <Users className="h-3 w-3" />
-                        <span className="tnum">{memberCount(group.id)}</span> membre(s)
+                        <span className="tnum">
+                          {t("groups.members", {
+                            n: formatNumber(memberCount(group.id), branding.locale),
+                          })}
+                        </span>
                       </p>
                     </div>
                   </div>
-                  <RowMenu actions={actions} label={`Actions pour ${group.name}`} />
+                  <RowMenu actions={actions} label={t("people.rowActions", { name: group.name })} />
                 </div>
 
                 {/* Doors */}
                 <div className="mt-4">
                   <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-text-muted">
-                    Portes
+                    {t("groups.doors")}
                   </p>
                   <div className="flex flex-wrap gap-1.5">
                     {group.door_ids.length === 0 ? (
                       <span className="inline-flex items-center gap-1.5 rounded-md border border-primary/25 bg-primary/[0.06] px-2 py-1 text-xs text-primary">
-                        <DoorOpen className="h-3.5 w-3.5" /> Toutes les portes
+                        <DoorOpen className="h-3.5 w-3.5" /> {t("groups.allDoors")}
                       </span>
                     ) : (
                       group.door_ids.map((id) => (
@@ -201,11 +197,11 @@ export default function GroupsPage() {
                 {/* Schedule */}
                 <div className="mt-4">
                   <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-text-muted">
-                    Horaires
+                    {t("groups.schedule")}
                   </p>
                   {always ? (
                     <span className="inline-flex items-center gap-1.5 rounded-md border border-primary/25 bg-primary/[0.06] px-2 py-1 text-xs text-primary">
-                      <CalendarClock className="h-3.5 w-3.5" /> Toujours autorisé
+                      <CalendarClock className="h-3.5 w-3.5" /> {t("groups.always")}
                     </span>
                   ) : (
                     <ul className="space-y-1">
@@ -216,7 +212,7 @@ export default function GroupsPage() {
                             key={d}
                             className="flex items-center justify-between rounded-md border border-border bg-surface-2/30 px-2.5 py-1.5 text-xs"
                           >
-                            <span className="font-medium text-text">{DAY_SHORT[d]}</span>
+                            <span className="font-medium text-text">{t(`day.${d}`)}</span>
                             <span className="tnum text-text-muted">
                               {window[0]} → {window[1]}
                             </span>
@@ -244,18 +240,14 @@ export default function GroupsPage() {
         open={deleting !== null}
         onClose={() => setDeleting(null)}
         onConfirm={confirmDelete}
-        title="Supprimer le groupe d'accès"
-        confirmLabel="Supprimer"
+        title={t("groups.delete.title")}
+        confirmLabel={t("common.delete")}
         description={
           <p>
-            Supprimer <span className="font-medium text-text">{deleting?.name}</span> ?{" "}
-            {deleting && memberCount(deleting.id) > 0 ? (
-              <>
-                <span className="tnum font-medium text-text">{memberCount(deleting.id)}</span>{" "}
-                membre(s) perdront ce groupe et suivront la règle par défaut.{" "}
-              </>
-            ) : null}
-            Cette action est irréversible.
+            {t("groups.delete.desc", { name: deleting?.name ?? "" })}
+            {deleting && memberCount(deleting.id) > 0
+              ? ` ${t("groups.delete.members", { n: memberCount(deleting.id) })}`
+              : ""}
           </p>
         }
       />

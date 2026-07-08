@@ -44,6 +44,7 @@ from ..doors.base import DoorContext
 from ..models.schemas import RecognizeMember, RecognizeResult
 from ..services import attendance as attendance_service
 from ..services import decision as decision_service
+from ..services import energy as energy_service
 from . import alerts as alerts_router
 from . import settings as settings_router
 
@@ -128,7 +129,7 @@ def _load_door(door_id: Optional[str]) -> Optional[dict[str, Any]]:
         return None
     return db.query_one(
         "SELECT id, site_id, name, location, direction, driver, driver_config, "
-        "relock_seconds, enabled FROM doors WHERE id = %s",
+        "relock_seconds, enabled, zone_id FROM doors WHERE id = %s",
         (door_id,),
     )
 
@@ -417,6 +418,12 @@ async def recognize(
                 door_opened = result.opened
             except Exception as exc:  # pragma: no cover - driver-specific
                 logger.warning("Door driver failed on grant: %s", exc)
+
+        # Energy (v3): a granted entry re-occupies the door's zone. Switch any
+        # OFF rule covering that zone back ON immediately — fire-and-forget so
+        # the hot path never blocks or breaks on driver latency/failure.
+        if door and door.get("zone_id"):
+            energy_service.schedule_on(str(door["zone_id"]))
 
     # ---- Alerts -------------------------------------------------------------- #
     # Non-granted decisions alert as before; a granted double-entry at an

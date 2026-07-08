@@ -51,7 +51,7 @@ function InsightText({ insight }: { insight: Insight }) {
 }
 
 export function InsightsPanel({ className }: { className?: string }) {
-  const { branding } = useBranding();
+  const { branding, t } = useBranding();
   const [insights, setInsights] = useState<Insight[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -73,9 +73,7 @@ export function InsightsPanel({ className }: { className?: string }) {
           <h3 className="font-display font-semibold text-text">
             {branding.product_name} IQ
           </h3>
-          <p className="text-xs text-text-muted">
-            Signaux calculés localement — rien ne quitte votre serveur
-          </p>
+          <p className="text-xs text-text-muted">{t("iq.subtitle")}</p>
         </div>
         <Sparkles className="h-4 w-4 text-accent" />
       </div>
@@ -93,11 +91,7 @@ export function InsightsPanel({ className }: { className?: string }) {
           ))}
         </div>
       ) : insights.length === 0 ? (
-        <EmptyState
-          icon={Sparkles}
-          title="Rien à signaler — tout est normal."
-          className="py-8"
-        />
+        <EmptyState icon={Sparkles} title={t("iq.empty")} className="py-8" />
       ) : (
         <ul className="grid gap-2.5 lg:grid-cols-2">
           {insights.map((ins, i) => {

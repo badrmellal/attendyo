@@ -32,11 +32,13 @@ from .core.config import get_settings
 from .routers import (
     access_groups,
     alerts,
+    ask,
     attendance,
     audit as audit_router,
     auth,
     cameras,
     doors,
+    energy,
     events,
     health,
     insights,
@@ -47,8 +49,10 @@ from .routers import (
     settings as settings_router,
     stats,
     users,
+    zones,
 )
 from .seed import ensure_admin_user, seed_demo_if_enabled
+from .services import energy as energy_service
 
 logging.basicConfig(
     level=os.environ.get("ATTENDYO_LOG_LEVEL", "INFO"),
@@ -126,8 +130,15 @@ async def lifespan(app: FastAPI):
         # Never block startup on DB availability; /health reports the truth and
         # the orchestrator restarts dependencies. The pool retries on demand.
         logger.warning("Startup tasks deferred: %s", exc)
+    # v3: occupancy-driven energy evaluator (~60s tick). Guarded so it no-ops
+    # cleanly while the DB is briefly unavailable; never blocks startup.
+    try:
+        await energy_service.start_evaluator()
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.warning("Energy evaluator not started: %s", exc)
     yield
     logger.info("ATTENDYO API shutting down")
+    await energy_service.stop_evaluator()
     await run_in_threadpool(db.close_pool)
 
 
@@ -170,6 +181,10 @@ def create_app() -> FastAPI:
     app.include_router(users.router)
     # v2.1 (Smart Gate).
     app.include_router(insights.router)
+    # v3 (Spatial Intelligence).
+    app.include_router(zones.router)
+    app.include_router(ask.router)
+    app.include_router(energy.router)
 
     # Static media (snapshots). Created at startup; mounting a missing dir would
     # raise, so ensure it exists here too for safety.

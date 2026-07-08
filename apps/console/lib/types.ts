@@ -128,6 +128,8 @@ export type Door = {
   driver_config: Record<string, unknown>;
   relock_seconds: number;
   enabled: boolean;
+  /** v3 — the zone this door belongs to (nullable). camera→door→zone chain. */
+  zone_id?: string;
   created_at: string;
 };
 
@@ -179,6 +181,8 @@ export type DoorDraft = {
   driver_config: Record<string, unknown>;
   relock_seconds: number;
   enabled: boolean;
+  /** v3 — bind the door to a zone (empty ⇒ unassigned). */
+  zone_id?: string;
 };
 
 /** Fields posted to `POST /api/cameras` (and patched via PATCH). */
@@ -333,6 +337,13 @@ export type PresencePerson = {
   member_type: MemberType;
   first_in_ts: string;
   first_in_door_name?: string;
+  /**
+   * v3 — current zone: the zone of the door of the member's most recent granted
+   * event today. `GET /api/presence/now` gains these; `?zone_id=` filters by a
+   * zone (descendants included). Optional so older backends stay compatible.
+   */
+  zone_id?: string;
+  zone_name?: string;
 };
 
 export type PresenceNow = {
@@ -455,4 +466,146 @@ export type ImportResult = {
   created: number;
   skipped: number;
   errors: ImportError[];
+};
+
+// ===========================================================================
+// v3 — Spatial Intelligence (zones · energy · movement)
+// Mirrors CONTRACT.md "## v3 — Spatial Intelligence" and
+// db/migrations/004_spatial.sql exactly. Nothing here is cloud/LLM.
+//
+// COORDINATION: `Zone`, `ZoneKind`, `MemberTimeline`, and `TimelineStep` are
+// ALSO consumed by the sibling /map + Ask work. They are defined here (this
+// module ships first) so the Console compiles and renders standalone; if the
+// sibling also adds them, keep ONE copy at merge (see open_issues).
+// ===========================================================================
+
+/** Zone tier — a building holds floors, a floor holds areas. */
+export type ZoneKind = "building" | "floor" | "area";
+
+/**
+ * A spatial zone. `Door.zone_id` points here; camera→door→zone makes every
+ * recognition a location fix at zone granularity.
+ */
+export type Zone = {
+  id: string;
+  name: string;
+  kind: ZoneKind;
+  /** e.g. a floor inside a building. */
+  parent_id?: string;
+  /** Optional soft capacity for congestion tinting. */
+  capacity?: number;
+  /** Optional connected load (kW) for energy-savings math. */
+  energy_kw?: number;
+  created_at: string;
+};
+
+/** POST/PATCH body for `/api/zones`. Empty optionals ⇒ unset. */
+export type ZoneDraft = {
+  name: string;
+  kind: ZoneKind;
+  parent_id?: string;
+  capacity?: number;
+  energy_kw?: number;
+};
+
+/** `GET /api/zones/occupancy` — one row per zone (sibling /map consumes it). */
+export type ZoneOccupancy = {
+  zone_id: string;
+  name: string;
+  kind: ZoneKind;
+  parent_id?: string;
+  count: number;
+  capacity?: number;
+  /** Granted entries in the last 15 min. */
+  congestion: number;
+};
+
+/** Occupancy-driven energy automation. Same driver family as doors. */
+export type EnergyDriver = "webhook" | "simulation";
+export type EnergyRuleState = "on" | "off";
+
+export type EnergyRule = {
+  id: string;
+  zone_id: string;
+  name: string;
+  /** Zone empty this long → switch OFF. */
+  empty_minutes: number;
+  driver: EnergyDriver;
+  /** webhook: `{ url, method, on_off, on_on }`. */
+  driver_config: Record<string, unknown>;
+  enabled: boolean;
+  state: EnergyRuleState;
+  last_changed?: string;
+  created_at?: string;
+};
+
+/** POST/PATCH body for `/api/energy/rules`. */
+export type EnergyRuleDraft = {
+  zone_id: string;
+  name: string;
+  empty_minutes: number;
+  driver: EnergyDriver;
+  driver_config: Record<string, unknown>;
+  enabled: boolean;
+};
+
+/** One per-rule row inside the energy summary. */
+export type EnergyRuleSummary = {
+  rule_id: string;
+  name: string;
+  zone_id: string;
+  zone_name?: string;
+  driver: EnergyDriver;
+  enabled: boolean;
+  state: EnergyRuleState;
+  last_changed?: string;
+  /** Hours the zone has been OFF over the period. */
+  hours_off: number;
+  /** zone.energy_kw × hours_off. */
+  kwh_saved: number;
+};
+
+/** `GET /api/energy/summary?period=` — savings tally + per-rule rows. */
+export type EnergySummary = {
+  rules: number;
+  /** Rules whose state is currently `off` (the "N zones éteintes" count). */
+  off_now: number;
+  hours_off: number;
+  /** Σ zone.energy_kw × hours off. */
+  kwh_saved: number;
+  per_rule: EnergyRuleSummary[];
+};
+
+export type EnergyPeriod = "today" | "week" | "month";
+
+/** One door-crossing in a member's movement timeline. */
+export type TimelineStep = {
+  ts: string;
+  door_name?: string;
+  zone_name?: string;
+  direction: AccessDirection;
+  decision: AccessDecision;
+};
+
+/** `GET /api/members/{id}/timeline?date=` — zone-level movement from crossings. */
+export type MemberTimeline = {
+  member: { id: string; full_name: string; department?: string };
+  date: string;
+  steps: TimelineStep[];
+};
+
+/**
+ * `POST /api/ask { q }` — a deterministic, on-prem intent parser (no LLM, no
+ * cloud). Returns either a titled table (`columns` + `rows`), a `text` answer,
+ * or — when the question isn't understood — `intent: "unknown"` plus a list of
+ * supported `suggestions` the Console renders as clickable chips.
+ */
+export type AskResult = {
+  /** e.g. "late_count" | "inside_zone" | "overtime_by_department" | "unknown". */
+  intent: string;
+  title: string;
+  columns?: string[];
+  rows?: (string | number)[][];
+  text?: string;
+  suggestions?: string[];
 };

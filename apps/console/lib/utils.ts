@@ -58,19 +58,36 @@ export function formatDateTime(value?: string | null, locale: Locale = "fr"): st
   }).format(d);
 }
 
-/** A short relative label like `2m ago` / `just now`. */
-export function timeAgo(value?: string | null): string {
+/**
+ * A short relative label, localized by locale via `Intl.RelativeTimeFormat`:
+ *   fr `il y a 2 min`, en `2 min ago`, ar `قبل ٢ دقيقة`.
+ * "Just now" (< 5 s) is handled explicitly since RelativeTimeFormat has no
+ * dedicated zero-bucket phrasing.
+ */
+export function timeAgo(value?: string | null, locale: Locale = "fr"): string {
   const d = toDate(value);
   if (!d) return "—";
   const secs = Math.round((Date.now() - d.getTime()) / 1000);
-  if (secs < 5) return "just now";
-  if (secs < 60) return `${secs}s ago`;
+  if (secs < 5) return JUST_NOW[locale] ?? JUST_NOW.fr;
+  const rtf = new Intl.RelativeTimeFormat(tag(locale), { numeric: "always", style: "short" });
+  if (secs < 60) return rtf.format(-secs, "second");
   const mins = Math.round(secs / 60);
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 60) return rtf.format(-mins, "minute");
   const hrs = Math.round(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
+  if (hrs < 24) return rtf.format(-hrs, "hour");
   const days = Math.round(hrs / 24);
-  return `${days}d ago`;
+  return rtf.format(-days, "day");
+}
+
+const JUST_NOW: Record<Locale, string> = {
+  fr: "à l'instant",
+  en: "just now",
+  ar: "الآن",
+};
+
+/** Locale-aware integer/decimal formatting (grouping, digits). */
+export function formatNumber(value: number, locale: Locale = "fr"): string {
+  return new Intl.NumberFormat(tag(locale)).format(value);
 }
 
 /** Seconds → `8h 12m`. Used for worked-hours columns. */

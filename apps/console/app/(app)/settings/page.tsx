@@ -24,6 +24,7 @@ import { useBranding } from "@/components/BrandingProvider";
 import { getSettings, putSettings } from "@/lib/api";
 import { applyBrandingColors } from "@/lib/branding";
 import { TERMINOLOGY_PRESETS, memberTypeOptions, terminologyLabels } from "@/lib/terminology";
+import { decisionLabel as decisionLabelFor, statusLabel as statusLabelFor } from "@/lib/i18n";
 import type { Branding, Locale, Settings } from "@/lib/types";
 import { cn, hexToRgbTriplet } from "@/lib/utils";
 
@@ -34,7 +35,7 @@ const LOCALES: { value: Locale; label: string }[] = [
 ];
 
 export default function SettingsPage() {
-  const { setBranding: applyToApp } = useBranding();
+  const { setBranding: applyToApp, refresh, t } = useBranding();
   const [settings, setSettings] = useState<Settings | null>(null);
   const [draft, setDraft] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(true);
@@ -104,7 +105,11 @@ export default function SettingsPage() {
       const next = await putSettings(draft);
       setSettings(next);
       setDraft(next);
-      applyToApp(next.branding); // commit to the running app (colors + locale)
+      // Commit immediately so nothing flickers, then re-fetch so BrandingProvider
+      // repaints the whole app from the authoritative saved settings (colors +
+      // locale + terminology), live, with no reload — per the v3 contract.
+      applyToApp(next.branding);
+      await refresh();
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
     } finally {
@@ -131,10 +136,8 @@ export default function SettingsPage() {
     <div className="space-y-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="font-display text-xl font-semibold tracking-tight text-text">Paramètres</h2>
-          <p className="text-sm text-text-muted">
-            Identité de marque (white-label) et configuration de présence.
-          </p>
+          <h2 className="font-display text-xl font-semibold tracking-tight text-text">{t("settings.title")}</h2>
+          <p className="text-sm text-text-muted">{t("settings.subtitle")}</p>
         </div>
         <div className="flex items-center gap-2">
           {dirty && (
@@ -143,7 +146,7 @@ export default function SettingsPage() {
               onClick={reset}
               className="btn-ghost inline-flex items-center gap-2 px-4 py-2 text-sm"
             >
-              <RotateCcw className="h-4 w-4" /> Réinitialiser
+              <RotateCcw className="h-4 w-4" /> {t("common.reset")}
             </button>
           )}
           <button
@@ -159,7 +162,7 @@ export default function SettingsPage() {
             ) : (
               <Save className="h-4 w-4" />
             )}
-            {saved ? "Enregistré" : "Enregistrer"}
+            {saved ? t("common.saved") : t("common.save")}
           </button>
         </div>
       </div>
@@ -174,30 +177,30 @@ export default function SettingsPage() {
                 <Palette className="h-4 w-4" />
               </span>
               <div>
-                <h3 className="font-display font-semibold text-text">Identité de marque</h3>
-                <p className="text-xs text-text-muted">Lue depuis GET /api/settings → branding</p>
+                <h3 className="font-display font-semibold text-text">{t("settings.branding.title")}</h3>
+                <p className="text-xs text-text-muted">{t("settings.branding.sub")}</p>
               </div>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Nom du produit">
+              <Field label={t("settings.field.productName")}>
                 <input
                   className="field w-full px-3 py-2 text-sm"
                   value={b.product_name}
                   onChange={(e) => patchBranding({ product_name: e.target.value })}
                 />
               </Field>
-              <Field label="Logo (URL)">
+              <Field label={t("settings.field.logo")}>
                 <input
                   className="field w-full px-3 py-2 text-sm"
                   value={b.logo_url ?? ""}
-                  placeholder="https://…/logo.svg (optionnel)"
+                  placeholder={t("settings.field.logoPlaceholder")}
                   onChange={(e) => patchBranding({ logo_url: e.target.value || null })}
                 />
               </Field>
             </div>
 
-            <Field label="Slogan" className="mt-4">
+            <Field label={t("settings.field.tagline")} className="mt-4">
               <input
                 className="field w-full px-3 py-2 text-sm"
                 value={b.tagline}
@@ -207,20 +210,22 @@ export default function SettingsPage() {
 
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <ColorField
-                label="Couleur primaire"
+                label={t("settings.field.primaryColor")}
                 value={b.primary_color}
                 valid={primaryValid}
+                invalidMsg={t("settings.invalidHex")}
                 onChange={(v) => patchBranding({ primary_color: v })}
               />
               <ColorField
-                label="Couleur d'accent"
+                label={t("settings.field.accentColor")}
                 value={b.accent_color}
                 valid={accentValid}
+                invalidMsg={t("settings.invalidHex")}
                 onChange={(v) => patchBranding({ accent_color: v })}
               />
             </div>
 
-            <Field label="Langue" className="mt-4">
+            <Field label={t("settings.field.language")} className="mt-4">
               <div className="inline-flex rounded-lg border border-border bg-surface-2/40 p-1">
                 {LOCALES.map((l) => (
                   <button
@@ -240,7 +245,7 @@ export default function SettingsPage() {
               </div>
             </Field>
 
-            <Field label="Terminologie" className="mt-4">
+            <Field label={t("settings.field.terminology")} className="mt-4">
               <div className="grid gap-2 sm:grid-cols-3">
                 {TERMINOLOGY_PRESETS.map((p) => (
                   <button
@@ -267,9 +272,7 @@ export default function SettingsPage() {
                   </button>
                 ))}
               </div>
-              <p className="mt-1.5 text-xs text-text-muted/80">
-                Relabellise toute la Console — menu, filtres, rapports — sans redéploiement.
-              </p>
+              <p className="mt-1.5 text-xs text-text-muted/80">{t("settings.terminology.hint")}</p>
             </Field>
           </section>
 
@@ -280,18 +283,18 @@ export default function SettingsPage() {
                 <SlidersHorizontal className="h-4 w-4" />
               </span>
               <div>
-                <h3 className="font-display font-semibold text-text">Présence</h3>
-                <p className="text-xs text-text-muted">Stratégie de pointage et anti-rebond</p>
+                <h3 className="font-display font-semibold text-text">{t("settings.attendance.title")}</h3>
+                <p className="text-xs text-text-muted">{t("settings.attendance.sub")}</p>
               </div>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Stratégie entrée/sortie">
+              <Field label={t("settings.field.strategy")}>
                 <select className="field w-full px-3 py-2 text-sm" value={draft.attendance.in_out_strategy} disabled>
-                  <option value="first_in_last_out">Première entrée / Dernière sortie</option>
+                  <option value="first_in_last_out">{t("settings.strategy.firstInLastOut")}</option>
                 </select>
               </Field>
-              <Field label="Délai anti-rebond (s)">
+              <Field label={t("settings.field.debounce")}>
                 <input
                   type="number"
                   min={0}
@@ -306,10 +309,8 @@ export default function SettingsPage() {
 
             <label className="mt-4 flex cursor-pointer items-center justify-between rounded-lg border border-border bg-surface-2/30 px-4 py-3">
               <div>
-                <p className="text-sm font-medium text-text">Ouverture auto à l'autorisation</p>
-                <p className="text-xs text-text-muted">
-                  Déclenche le pilote de porte dès qu'un accès est autorisé.
-                </p>
+                <p className="text-sm font-medium text-text">{t("settings.field.autoOpen")}</p>
+                <p className="text-xs text-text-muted">{t("settings.field.autoOpen.sub")}</p>
               </div>
               <Toggle
                 checked={draft.attendance.auto_open_on_grant}
@@ -325,13 +326,13 @@ export default function SettingsPage() {
                 <ShieldCheck className="h-4 w-4" />
               </span>
               <div>
-                <h3 className="font-display font-semibold text-text">Sécurité</h3>
-                <p className="text-xs text-text-muted">Anti-bruit des alertes à la porte</p>
+                <h3 className="font-display font-semibold text-text">{t("settings.security.title")}</h3>
+                <p className="text-xs text-text-muted">{t("settings.security.sub")}</p>
               </div>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Délai entre alertes (s)">
+              <Field label={t("settings.field.alertCooldown")}>
                 <input
                   type="number"
                   min={0}
@@ -345,11 +346,7 @@ export default function SettingsPage() {
                 />
               </Field>
             </div>
-            <p className="mt-2 text-xs text-text-muted/80">
-              Au plus une alerte par porte et par type pendant ce délai — un inconnu qui
-              reste devant la porte ne génère qu'une seule alerte, pas une par image. Les
-              événements restent tous journalisés.
-            </p>
+            <p className="mt-2 text-xs text-text-muted/80">{t("settings.security.hint")}</p>
           </section>
         </div>
 
@@ -358,7 +355,7 @@ export default function SettingsPage() {
           <div className="card overflow-hidden">
             <div className="border-b border-border px-5 py-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">
-                Aperçu en direct
+                {t("settings.preview.title")}
               </p>
             </div>
             <div className="space-y-4 p-5">
@@ -378,18 +375,18 @@ export default function SettingsPage() {
 
               {/* Token chips */}
               <div className="flex flex-wrap gap-2">
-                <Pill tone="ok">Autorisé</Pill>
-                <Pill tone="warn">En retard</Pill>
-                <Pill tone="danger">Refusé</Pill>
+                <Pill tone="ok">{decisionLabelFor(b.locale, "granted")}</Pill>
+                <Pill tone="warn">{statusLabelFor(b.locale, "late")}</Pill>
+                <Pill tone="danger">{decisionLabelFor(b.locale, "denied")}</Pill>
               </div>
 
               {/* Buttons */}
               <div className="flex gap-2">
                 <button className="btn-primary px-3 py-1.5 text-sm" type="button">
-                  Action primaire
+                  {t("settings.preview.primaryAction")}
                 </button>
                 <button className="btn-ghost px-3 py-1.5 text-sm" type="button">
-                  Secondaire
+                  {t("settings.preview.secondary")}
                 </button>
               </div>
 
@@ -402,20 +399,21 @@ export default function SettingsPage() {
                   <p className="text-sm font-medium text-text">Yasmine El Amrani</p>
                   <p className="text-xs text-text-muted">Entrée Principale</p>
                 </div>
-                <span className="text-xs font-medium text-primary">Autorisé</span>
+                <span className="text-xs font-medium text-primary">{decisionLabelFor(b.locale, "granted")}</span>
               </div>
 
               {/* Terminology preview */}
               <div className="rounded-lg bg-surface-2/40 px-3 py-2.5">
                 <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">
-                  Terminologie —{" "}
+                  {t("settings.preview.terminology")} —{" "}
                   {TERMINOLOGY_PRESETS.find((p) => p.value === b.terminology)?.label}
                 </p>
                 <p className="mt-1.5 text-xs text-text-muted">
-                  Menu : <span className="font-medium text-text">{termPreview.peopleNav}</span>
+                  {t("settings.preview.menu")} :{" "}
+                  <span className="font-medium text-text">{termPreview.peopleNav}</span>
                 </p>
                 <p className="text-xs text-text-muted">
-                  Champ :{" "}
+                  {t("settings.preview.field")} :{" "}
                   <span className="font-medium text-text">{termPreview.departmentLabel}</span>
                 </p>
                 <div className="mt-1.5 flex flex-wrap gap-1.5">
@@ -435,14 +433,12 @@ export default function SettingsPage() {
               {/* Locale note */}
               <div className="flex items-center gap-2 rounded-lg bg-surface-2/40 px-3 py-2 text-xs text-text-muted">
                 <Globe className="h-3.5 w-3.5" />
-                Langue: {LOCALES.find((l) => l.value === b.locale)?.label}
+                {t("settings.preview.language")}: {LOCALES.find((l) => l.value === b.locale)?.label}
                 {b.locale === "ar" && " · RTL"}
               </div>
             </div>
           </div>
-          <p className="mt-3 px-1 text-xs text-text-muted">
-            Les couleurs sont appliquées à toute la Console au moment de l'enregistrement.
-          </p>
+          <p className="mt-3 px-1 text-xs text-text-muted">{t("settings.preview.colorsNote")}</p>
         </div>
       </div>
     </div>
@@ -470,11 +466,13 @@ function ColorField({
   label,
   value,
   valid,
+  invalidMsg,
   onChange,
 }: {
   label: string;
   value: string;
   valid: boolean;
+  invalidMsg: string;
   onChange: (v: string) => void;
 }) {
   // Native color input needs a clean #rrggbb; fall back gracefully.
@@ -498,7 +496,7 @@ function ColorField({
           spellCheck={false}
         />
       </div>
-      {!valid && <p className="mt-1 text-xs text-danger">Couleur hexadécimale invalide</p>}
+      {!valid && <p className="mt-1 text-xs text-danger">{invalidMsg}</p>}
     </Field>
   );
 }

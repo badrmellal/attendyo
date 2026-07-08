@@ -13,6 +13,7 @@ import type {
   AccessGroupDraft,
   Alert,
   AlertQuery,
+  AskResult,
   AttendanceDay,
   AuditEntry,
   AuditQuery,
@@ -22,6 +23,10 @@ import type {
   DepartmentReport,
   Door,
   DoorDraft,
+  EnergyPeriod,
+  EnergyRule,
+  EnergyRuleDraft,
+  EnergySummary,
   HealthStatus,
   ImportError,
   ImportResult,
@@ -32,6 +37,7 @@ import type {
   MemberPatch,
   MemberQuery,
   MemberReport,
+  MemberTimeline,
   MemberType,
   OperatorUser,
   PresenceNow,
@@ -41,6 +47,9 @@ import type {
   TodayStats,
   UserDraft,
   UserPatch,
+  Zone,
+  ZoneDraft,
+  ZoneOccupancy,
 } from "./types";
 import {
   MOCK_EVENTS,
@@ -50,26 +59,36 @@ import {
   addMockAccessGroup,
   addMockCamera,
   addMockDoor,
+  addMockEnergyRule,
   addMockMember,
   addMockUser,
+  addMockZone,
   appendMockAudit,
   deleteMockAccessGroup,
   deleteMockCamera,
   deleteMockDoor,
+  deleteMockEnergyRule,
   deleteMockMember,
   deleteMockUser,
+  deleteMockZone,
   getMockAccessGroups,
   getMockAlertCount,
   getMockAlerts,
   getMockAudit,
   getMockCameras,
   getMockDoors,
+  getMockEnergyRules,
   getMockMembers,
   getMockSettings,
   getMockUsers,
+  getMockZones,
+  mockAsk,
+  mockEnergySummary,
   mockId,
   mockInsights,
+  mockMemberTimeline,
   mockPresenceNow,
+  mockZoneOccupancy,
   mockReportsDepartments,
   mockReportsMembers,
   mockReportsSummary,
@@ -80,8 +99,10 @@ import {
   updateMockAccessGroup,
   updateMockCamera,
   updateMockDoor,
+  updateMockEnergyRule,
   updateMockMember,
   updateMockUser,
+  updateMockZone,
 } from "./mock";
 import { hoursDecimal, todayISO } from "./utils";
 
@@ -880,11 +901,14 @@ export async function getInsights(limit = 10): Promise<Insight[]> {
 
 // --------------------------------------------------------------------------
 // Presence / muster (`GET /api/presence/now`, operator+)
+// v3: `zone_id` scopes the list to a zone (descendants included) — the Live Map
+// and the Ask "inside_zone" intent both use it to answer "who is inside X".
 // --------------------------------------------------------------------------
-export async function getPresenceNow(): Promise<PresenceNow> {
+export async function getPresenceNow(zoneId?: string): Promise<PresenceNow> {
+  const qs = zoneId ? `?zone_id=${encodeURIComponent(zoneId)}` : "";
   return withMock(
-    () => request<PresenceNow>("/api/presence/now"),
-    () => mockPresenceNow(),
+    () => request<PresenceNow>(`/api/presence/now${qs}`),
+    () => mockPresenceNow(zoneId),
   );
 }
 
@@ -1191,6 +1215,180 @@ export async function importMembersCSV(file: File): Promise<ImportResult> {
     async () => {
       await delay(600);
       return importMembersMock(file);
+    },
+  );
+}
+
+// ==========================================================================
+// v3 — Spatial Intelligence (zones · energy · movement)
+//
+// COORDINATION: `getZones` and `getMemberTimeline` are also needed by the
+// sibling /map + Ask work. Provided here so the Console compiles/renders
+// standalone; keep ONE copy at merge (see open_issues). The zone MUTATIONS
+// (create/update/delete) and everything energy/movement are this module's.
+// ==========================================================================
+
+// --------------------------------------------------------------------------
+// Zones (`/api/zones`, operator+ mutations)
+// --------------------------------------------------------------------------
+export async function getZones(): Promise<Zone[]> {
+  return withMock(
+    () => request<Zone[]>("/api/zones"),
+    () => getMockZones(),
+  );
+}
+
+/**
+ * `GET /api/zones/occupancy` — live occupancy per zone (count/capacity +
+ * congestion = granted entries in the last 15 min). Feeds the Live Map tinting.
+ */
+export async function getZoneOccupancy(): Promise<ZoneOccupancy[]> {
+  return withMock(
+    () => request<ZoneOccupancy[]>("/api/zones/occupancy"),
+    () => mockZoneOccupancy(),
+  );
+}
+
+export async function createZone(draft: ZoneDraft): Promise<Zone> {
+  return withMock(
+    () =>
+      request<Zone>("/api/zones", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(draft),
+      }),
+    async () => {
+      await delay(400);
+      return addMockZone(draft);
+    },
+  );
+}
+
+export async function updateZone(id: string, patch: Partial<ZoneDraft>): Promise<Zone> {
+  return withMock(
+    () =>
+      request<Zone>(`/api/zones/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      }),
+    async () => {
+      await delay(350);
+      try {
+        return updateMockZone(id, patch);
+      } catch {
+        throw new ApiError(404, "Zone not found");
+      }
+    },
+  );
+}
+
+export async function deleteZone(id: string): Promise<void> {
+  return withMock(
+    () => request<void>(`/api/zones/${id}`, { method: "DELETE" }),
+    async () => {
+      await delay(300);
+      deleteMockZone(id);
+    },
+  );
+}
+
+// --------------------------------------------------------------------------
+// Energy rules (`/api/energy/*`, operator+)
+// --------------------------------------------------------------------------
+export async function getEnergyRules(): Promise<EnergyRule[]> {
+  return withMock(
+    () => request<EnergyRule[]>("/api/energy/rules"),
+    () => getMockEnergyRules(),
+  );
+}
+
+export async function createEnergyRule(draft: EnergyRuleDraft): Promise<EnergyRule> {
+  return withMock(
+    () =>
+      request<EnergyRule>("/api/energy/rules", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(draft),
+      }),
+    async () => {
+      await delay(400);
+      return addMockEnergyRule(draft);
+    },
+  );
+}
+
+export async function updateEnergyRule(
+  id: string,
+  patch: Partial<EnergyRuleDraft>,
+): Promise<EnergyRule> {
+  return withMock(
+    () =>
+      request<EnergyRule>(`/api/energy/rules/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      }),
+    async () => {
+      await delay(350);
+      try {
+        return updateMockEnergyRule(id, patch);
+      } catch {
+        throw new ApiError(404, "Energy rule not found");
+      }
+    },
+  );
+}
+
+export async function deleteEnergyRule(id: string): Promise<void> {
+  return withMock(
+    () => request<void>(`/api/energy/rules/${id}`, { method: "DELETE" }),
+    async () => {
+      await delay(300);
+      deleteMockEnergyRule(id);
+    },
+  );
+}
+
+export async function getEnergySummary(period: EnergyPeriod = "month"): Promise<EnergySummary> {
+  return withMock(
+    () => request<EnergySummary>(`/api/energy/summary?period=${period}`),
+    () => mockEnergySummary(period),
+  );
+}
+
+// --------------------------------------------------------------------------
+// Movement timeline (`GET /api/members/{id}/timeline?date=`, operator+)
+// Zone-level tracking from door crossings — granted only unless `all`.
+// --------------------------------------------------------------------------
+export async function getMemberTimeline(
+  memberId: string,
+  date: string,
+  all = false,
+): Promise<MemberTimeline> {
+  const qs = new URLSearchParams({ date });
+  if (all) qs.set("all", "1");
+  return withMock(
+    () => request<MemberTimeline>(`/api/members/${memberId}/timeline?${qs.toString()}`),
+    () => mockMemberTimeline(memberId, date, all),
+  );
+}
+
+// --------------------------------------------------------------------------
+// Ask (`POST /api/ask`, operator+) — a deterministic, on-prem intent parser.
+// No LLM, no cloud: the answer to "AI questions" that never leaves the box.
+// --------------------------------------------------------------------------
+export async function ask(q: string): Promise<AskResult> {
+  return withMock(
+    () =>
+      request<AskResult>("/api/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ q }),
+      }),
+    async () => {
+      await delay(280);
+      return mockAsk(q);
     },
   );
 }

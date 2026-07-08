@@ -84,11 +84,16 @@ def _clear_demo() -> None:
     """
     db.execute("DELETE FROM alerts")
     db.execute("DELETE FROM audit_log WHERE details->>'demo' = 'true'")
+    # v3 spatial: energy_log cascades from energy_rules, energy_rules from zones,
+    # but delete explicitly (clear order-independent). doors.zone_id is SET NULL.
+    db.execute("DELETE FROM energy_log")
+    db.execute("DELETE FROM energy_rules")
     db.execute("DELETE FROM attendance_days")
     db.execute("DELETE FROM access_events")
     db.execute("DELETE FROM members")
     db.execute("DELETE FROM cameras")
     db.execute("DELETE FROM doors")
+    db.execute("DELETE FROM zones")
     db.execute("DELETE FROM sites")
 
 
@@ -102,26 +107,66 @@ def _create_site() -> dict[str, Any]:
     )
 
 
-def _create_doors(site_id: str) -> list[dict[str, Any]]:
+def _create_zones() -> dict[str, dict[str, Any]]:
+    """Two buildings and their floors (the v3 spatial tree).
+
+    Siège (A) holds the entrance/exit floors; the empty ``2e étage A`` has no
+    door and is the clean target for the energy-off demo. Annexe (B) is where a
+    slice of the on-site roster is currently located, so ``inside Building B``,
+    occupancy and the live map all have real data.
+    """
+    def mk(name: str, kind: str, parent_id: Optional[str],
+           capacity: Optional[int], energy_kw: Optional[float]) -> dict[str, Any]:
+        return db.execute_returning(
+            """
+            INSERT INTO zones (name, kind, parent_id, capacity, energy_kw)
+            VALUES (%s, %s, %s, %s, %s)
+            RETURNING id, name, kind, parent_id
+            """,
+            (name, kind, parent_id, capacity, energy_kw),
+        )
+
+    a = mk("Siège", "building", None, 120, None)
+    b = mk("Annexe", "building", None, 60, None)
+    return {
+        "A": a,
+        "B": b,
+        "RDC_A": mk("Rez-de-chaussée A", "floor", a["id"], 45, 6.0),
+        "ET1_A": mk("1er étage A", "floor", a["id"], 45, 5.5),
+        "ET2_A": mk("2e étage A", "floor", a["id"], 40, 5.0),
+        "RDC_B": mk("Rez-de-chaussée B", "floor", b["id"], 40, 4.0),
+    }
+
+
+def _create_doors(site_id: str, zones: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
     entrance = db.execute_returning(
         """
         INSERT INTO doors (site_id, name, location, direction, driver, driver_config,
-                           relock_seconds, enabled)
-        VALUES (%s, 'Entrée Principale', 'Hall RDC', 'in', 'simulation', '{}'::jsonb, 5, TRUE)
-        RETURNING id, name, direction
+                           relock_seconds, enabled, zone_id)
+        VALUES (%s, 'Entrée Principale', 'Hall RDC', 'in', 'simulation', '{}'::jsonb, 5, TRUE, %s)
+        RETURNING id, name, direction, zone_id
         """,
-        (site_id,),
+        (site_id, zones["RDC_A"]["id"]),
     )
     exit_door = db.execute_returning(
         """
         INSERT INTO doors (site_id, name, location, direction, driver, driver_config,
-                           relock_seconds, enabled)
-        VALUES (%s, 'Sortie Personnel', 'Couloir B', 'out', 'simulation', '{}'::jsonb, 5, TRUE)
-        RETURNING id, name, direction
+                           relock_seconds, enabled, zone_id)
+        VALUES (%s, 'Sortie Personnel', 'Couloir B', 'out', 'simulation', '{}'::jsonb, 5, TRUE, %s)
+        RETURNING id, name, direction, zone_id
         """,
-        (site_id,),
+        (site_id, zones["ET1_A"]["id"]),
     )
-    return [entrance, exit_door]
+    annexe = db.execute_returning(
+        """
+        INSERT INTO doors (site_id, name, location, direction, driver, driver_config,
+                           relock_seconds, enabled, zone_id)
+        VALUES (%s, 'Passerelle Annexe', 'Annexe RDC', 'in', 'simulation', '{}'::jsonb, 5, TRUE, %s)
+        RETURNING id, name, direction, zone_id
+        """,
+        (site_id, zones["RDC_B"]["id"]),
+    )
+    return [entrance, exit_door, annexe]
 
 
 def _create_camera(door_id: str) -> None:
@@ -524,20 +569,136 @@ def _seed_audit(members: list[dict[str, Any]], doors: list[dict[str, Any]]) -> N
         )
 
 
+def _seed_zone_movements(doors: list[dict[str, Any]]) -> None:
+    """Move a slice of the on-site roster into the Annexe (Building B).
+
+    Current zone = the zone of a member's most recent granted event today. By
+    inserting a recent granted *in* at the Annexe door for every third on-site
+    member, those people's current zone becomes Building B — so occupancy, the
+    live map and the Ask "inside Building B" question all have real data, and a
+    couple within the 15-minute window register as congestion.
+    """
+    annexe = next((d for d in doors if d.get("name") == "Passerelle Annexe"), None)
+    if annexe is None:
+        return
+    tz = _casablanca_tz()
+    today = dt.datetime.now(tz).date()
+    # Each move is stamped just AFTER that member's own latest event today, so it
+    # is reliably their most-recent granted event → current zone = Annexe — no
+    # matter what wall-clock time the demo is seeded at (the roster writes a full
+    # synthetic day, incl. midday events that could otherwise dominate).
+    on_site = db.query_all(
+        """
+        SELECT a.member_id, m.subject_name,
+               (SELECT max(e.ts) FROM access_events e
+                WHERE e.member_id = a.member_id AND e.decision = 'granted'
+                  AND e.ts >= %s::date) AS last_ts
+        FROM attendance_days a
+        JOIN members m ON m.id = a.member_id AND m.status = 'active'
+        WHERE a.work_date = %s
+          AND a.first_in_ts IS NOT NULL
+          AND (a.last_out_ts IS NULL OR a.last_out_ts <= a.first_in_ts)
+        ORDER BY a.first_in_ts ASC
+        """,
+        (today, today),
+    )
+    for row in on_site[::3]:
+        base = row.get("last_ts") or dt.datetime.now(dt.timezone.utc)
+        when_utc = base + dt.timedelta(minutes=_RNG.randint(2, 10))
+        db.execute(
+            """
+            INSERT INTO access_events
+                (ts, member_id, subject_name, similarity, door_id, direction,
+                 decision, reason)
+            VALUES (%s, %s, %s, %s, %s, 'in', 'granted', NULL)
+            """,
+            (
+                when_utc, row["member_id"], row["subject_name"],
+                round(_RNG.uniform(0.90, 0.99), 4), annexe["id"],
+            ),
+        )
+
+
+def _create_energy_rules(zones: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
+    """One rule on the always-empty 2e étage (the evaluator turns it OFF live)
+    and one on the occupied Annexe (stays ON) — a clear before/after demo."""
+    rules: list[dict[str, Any]] = []
+    rules.append(
+        db.execute_returning(
+            """
+            INSERT INTO energy_rules (zone_id, name, empty_minutes, driver,
+                                      driver_config, enabled, state)
+            VALUES (%s, 'CVC 2e étage', 15, 'simulation', '{}'::jsonb, TRUE, 'on')
+            RETURNING id, zone_id, name
+            """,
+            (zones["ET2_A"]["id"],),
+        )
+    )
+    rules.append(
+        db.execute_returning(
+            """
+            INSERT INTO energy_rules (zone_id, name, empty_minutes, driver,
+                                      driver_config, enabled, state)
+            VALUES (%s, 'Éclairage Annexe', 30, 'simulation', '{}'::jsonb, TRUE, 'on')
+            RETURNING id, zone_id, name
+            """,
+            (zones["B"]["id"],),
+        )
+    )
+    return rules
+
+
+def _seed_energy_history(rules: list[dict[str, Any]], zones: dict[str, Any]) -> None:
+    """Closed energy_log episodes for the 2e-étage rule over recent workdays so
+    the savings card ("kWh économisés ce mois") is non-zero out of the box."""
+    rule = next((r for r in rules if str(r["zone_id"]) == str(zones["ET2_A"]["id"])), None)
+    if rule is None:
+        return
+    tz = _casablanca_tz()
+    today = dt.datetime.now(tz).date()
+    for offset in range(1, 8):
+        day = today - dt.timedelta(days=offset)
+        if day.weekday() >= 5:  # skip weekends
+            continue
+        # An empty stretch on that day (e.g. after-hours), 2–5 h long.
+        off_local = dt.datetime.combine(day, dt.time(18, 30), tzinfo=tz) \
+            + dt.timedelta(minutes=_RNG.randint(-40, 40))
+        on_local = off_local + dt.timedelta(
+            hours=_RNG.randint(2, 5), minutes=_RNG.randint(0, 59)
+        )
+        db.execute(
+            """
+            INSERT INTO energy_log (rule_id, went_off_at, back_on_at)
+            VALUES (%s, %s, %s)
+            """,
+            (
+                rule["id"],
+                off_local.astimezone(dt.timezone.utc),
+                on_local.astimezone(dt.timezone.utc),
+            ),
+        )
+
+
 def seed_all() -> dict[str, Any]:
     """Wipe and rebuild the full demo dataset. Returns a small summary."""
     _clear_demo()
     _ensure_demo_users()
     site = _create_site()
-    doors = _create_doors(site["id"])
+    zones = _create_zones()
+    doors = _create_doors(site["id"], zones)
     _create_camera(doors[0]["id"])
     members = _create_members()
     _seed_attendance_and_events(site, members, doors)
+    _seed_zone_movements(doors)
+    energy_rules = _create_energy_rules(zones)
+    _seed_energy_history(energy_rules, zones)
     _seed_audit(members, doors)
 
     summary = {
         "site": site["id"],
         "doors": [d["id"] for d in doors],
+        "zones": len(zones),
+        "energy_rules": len(energy_rules),
         "members": len(members),
         "events_today": (db.query_one(
             "SELECT count(*) AS c FROM access_events WHERE ts::date = current_date"

@@ -12,10 +12,10 @@ import { LiveFeed } from "@/components/LiveFeed";
 import { useBranding } from "@/components/BrandingProvider";
 import { listDoors, streamEvents } from "@/lib/api";
 import type { AccessEvent, Door } from "@/lib/types";
-import { cn } from "@/lib/utils";
+import { cn, formatNumber } from "@/lib/utils";
 
 export default function MonitorPage() {
-  const { decisionLabel } = useBranding();
+  const { decisionLabel, t, branding } = useBranding();
   const [live, setLive] = useState(false);
   const [doors, setDoors] = useState<Door[]>([]);
   const [counts, setCounts] = useState({ granted: 0, denied: 0, total: 0 });
@@ -60,10 +60,10 @@ export default function MonitorPage() {
           </span>
           <div>
             <h2 className="font-display text-xl font-semibold tracking-tight text-text">
-              Surveillance en direct
+              {t("monitor.title")}
             </h2>
             <p className="text-sm text-text-muted">
-              {live ? "Connecté au flux d'accès" : "Flux simulé (démo)"}
+              {live ? t("monitor.connected") : t("monitor.simulated")}
             </p>
           </div>
         </div>
@@ -71,8 +71,8 @@ export default function MonitorPage() {
         {/* Counters */}
         <div className="flex items-center gap-3">
           <Counter icon={ShieldCheck} label={decisionLabel("granted")} value={counts.granted} tone="ok" />
-          <Counter icon={ShieldX} label="Refusés" value={counts.denied} tone="danger" />
-          <Counter icon={ListFilter} label="Total" value={counts.total} tone="muted" />
+          <Counter icon={ShieldX} label={t("monitor.denied")} value={counts.denied} tone="danger" />
+          <Counter icon={ListFilter} label={t("monitor.total")} value={counts.total} tone="muted" />
         </div>
       </div>
 
@@ -89,9 +89,9 @@ export default function MonitorPage() {
 
       {doors.length > 0 && (
         <p className="text-center text-xs text-text-muted">
-          Surveillance de{" "}
-          <span className="font-medium text-text">{doors.filter((d) => d.enabled).length}</span>{" "}
-          porte(s) active(s)
+          {t("monitor.activeDoors", {
+            n: formatNumber(doors.filter((d) => d.enabled).length, branding.locale),
+          })}
         </p>
       )}
     </div>

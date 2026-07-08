@@ -237,3 +237,45 @@ INSERT INTO settings (key, value) VALUES
         "alert_cooldown_seconds": 45
     }'::jsonb)
 ON CONFLICT (key) DO NOTHING;
+
+-- ---------------------------------------------------------------------------
+-- v3 Spatial Intelligence: zones, door→zone chain, energy automation
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS zones (
+    id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name       TEXT NOT NULL,
+    kind       TEXT NOT NULL DEFAULT 'area'
+                   CHECK (kind IN ('building','floor','area')),
+    parent_id  UUID REFERENCES zones(id) ON DELETE SET NULL,
+    capacity   INT,
+    energy_kw  NUMERIC,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE doors ADD COLUMN IF NOT EXISTS zone_id UUID REFERENCES zones(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_doors_zone ON doors(zone_id);
+CREATE INDEX IF NOT EXISTS idx_events_member_granted_ts
+    ON access_events(member_id, ts DESC) WHERE decision = 'granted';
+
+CREATE TABLE IF NOT EXISTS energy_rules (
+    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    zone_id       UUID NOT NULL REFERENCES zones(id) ON DELETE CASCADE,
+    name          TEXT NOT NULL,
+    empty_minutes INT  NOT NULL DEFAULT 15,
+    driver        TEXT NOT NULL DEFAULT 'simulation'
+                      CHECK (driver IN ('webhook','simulation')),
+    driver_config JSONB NOT NULL DEFAULT '{}',
+    enabled       BOOLEAN NOT NULL DEFAULT TRUE,
+    state         TEXT NOT NULL DEFAULT 'on'
+                      CHECK (state IN ('on','off')),
+    last_changed  TIMESTAMPTZ,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS energy_log (
+    id          BIGSERIAL PRIMARY KEY,
+    rule_id     UUID NOT NULL REFERENCES energy_rules(id) ON DELETE CASCADE,
+    went_off_at TIMESTAMPTZ NOT NULL,
+    back_on_at  TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_energy_log_rule ON energy_log(rule_id, went_off_at DESC);

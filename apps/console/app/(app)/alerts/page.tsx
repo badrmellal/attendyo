@@ -32,18 +32,20 @@ import { ackAlert, ackAllAlerts, listAlerts, notifyAlertsChanged, streamEvents }
 import type { Alert, AlertKind, AlertSeverity } from "@/lib/types";
 import { cn, formatDateTime, timeAgo } from "@/lib/utils";
 
-const KIND_META: Record<AlertKind, { label: string; icon: LucideIcon; tone: "danger" | "warn" | "info" }> = {
-  unknown_face: { label: "Visage inconnu", icon: ShieldQuestion, tone: "danger" },
-  not_authorized: { label: "Non autorisé", icon: ShieldAlert, tone: "warn" },
-  off_schedule: { label: "Hors horaire", icon: Clock3, tone: "warn" },
-  anti_passback: { label: "Double entrée", icon: Repeat2, tone: "info" },
-  system: { label: "Système", icon: Cog, tone: "info" },
+// Labels come from the i18n layer (alertKindLabel / alertSeverityLabel); this
+// map holds only the icon + tone, which are locale-independent.
+const KIND_META: Record<AlertKind, { icon: LucideIcon; tone: "danger" | "warn" | "info" }> = {
+  unknown_face: { icon: ShieldQuestion, tone: "danger" },
+  not_authorized: { icon: ShieldAlert, tone: "warn" },
+  off_schedule: { icon: Clock3, tone: "warn" },
+  anti_passback: { icon: Repeat2, tone: "info" },
+  system: { icon: Cog, tone: "info" },
 };
 
-const SEVERITY_META: Record<AlertSeverity, { label: string; tone: "info" | "warn" | "danger" }> = {
-  info: { label: "Info", tone: "info" },
-  warning: { label: "Avertissement", tone: "warn" },
-  critical: { label: "Critique", tone: "danger" },
+const SEVERITY_TONE: Record<AlertSeverity, "info" | "warn" | "danger"> = {
+  info: "info",
+  warning: "warn",
+  critical: "danger",
 };
 
 const TONE_RING: Record<string, string> = {
@@ -55,7 +57,7 @@ const TONE_RING: Record<string, string> = {
 type Scope = "all" | "unack";
 
 export default function AlertsPage() {
-  const { branding } = useBranding();
+  const { branding, t, alertKindLabel, alertSeverityLabel } = useBranding();
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
   const [scope, setScope] = useState<Scope>("unack");
@@ -135,16 +137,13 @@ export default function AlertsPage() {
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="font-display text-xl font-semibold tracking-tight text-text">Alertes</h2>
+          <h2 className="font-display text-xl font-semibold tracking-tight text-text">
+            {t("nav.alerts")}
+          </h2>
           <p className="text-sm text-text-muted">
-            {unackCount > 0 ? (
-              <>
-                <span className="tnum font-medium text-danger">{unackCount}</span> non
-                acquittée(s) affichée(s)
-              </>
-            ) : (
-              "Tout est acquitté."
-            )}
+            {unackCount > 0
+              ? t("alerts.subtitle.some", { n: unackCount })
+              : t("alerts.subtitle.none")}
           </p>
         </div>
         <button
@@ -154,7 +153,7 @@ export default function AlertsPage() {
           className="btn-ghost inline-flex items-center justify-center gap-2 px-4 py-2 text-sm disabled:opacity-50"
         >
           <CheckCheck className="h-4 w-4" />
-          Tout acquitter
+          {t("alerts.ackAll")}
         </button>
       </div>
 
@@ -169,7 +168,7 @@ export default function AlertsPage() {
               scope === "unack" ? "bg-surface text-text shadow-sm" : "text-text-muted",
             )}
           >
-            <BellRing className="h-4 w-4" /> Non acquittées
+            <BellRing className="h-4 w-4" /> {t("alerts.scope.unack")}
           </button>
           <button
             type="button"
@@ -179,7 +178,7 @@ export default function AlertsPage() {
               scope === "all" ? "bg-surface text-text shadow-sm" : "text-text-muted",
             )}
           >
-            <BellOff className="h-4 w-4" /> Toutes
+            <BellOff className="h-4 w-4" /> {t("alerts.scope.all")}
           </button>
         </div>
 
@@ -187,12 +186,12 @@ export default function AlertsPage() {
           value={kind}
           onChange={(e) => setKind(e.target.value as AlertKind | "")}
           className="field px-3 py-2 text-sm"
-          aria-label="Filtrer par type d'alerte"
+          aria-label={t("alerts.filterAria")}
         >
-          <option value="">Tous les types</option>
+          <option value="">{t("filter.allKinds")}</option>
           {(Object.keys(KIND_META) as AlertKind[]).map((k) => (
             <option key={k} value={k}>
-              {KIND_META[k].label}
+              {alertKindLabel(k)}
             </option>
           ))}
         </select>
@@ -215,19 +214,15 @@ export default function AlertsPage() {
         <div className="card">
           <EmptyState
             icon={BellOff}
-            title={scope === "unack" ? "Aucune alerte à acquitter" : "Aucune alerte"}
-            description={
-              kind
-                ? "Aucune alerte de ce type. Élargissez le filtre."
-                : "Les décisions refusées et les anomalies système apparaîtront ici en direct."
-            }
+            title={scope === "unack" ? t("alerts.empty.unack.title") : t("alerts.empty.all.title")}
+            description={kind ? t("alerts.empty.kind.desc") : t("alerts.empty.desc")}
           />
         </div>
       ) : (
         <ul className="space-y-2.5">
           {alerts.map((alert) => {
             const meta = KIND_META[alert.kind];
-            const severity = SEVERITY_META[alert.severity];
+            const severityTone = SEVERITY_TONE[alert.severity];
             const Icon = meta.icon;
             return (
               <li
@@ -256,15 +251,15 @@ export default function AlertsPage() {
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-medium text-text">{alert.message}</span>
                     <Pill tone={meta.tone === "warn" ? "warn" : meta.tone} dot={false}>
-                      {meta.label}
+                      {alertKindLabel(alert.kind)}
                     </Pill>
-                    <Pill tone={severity.tone} dot={false}>
-                      {severity.label}
+                    <Pill tone={severityTone} dot={false}>
+                      {alertSeverityLabel(alert.severity)}
                     </Pill>
                   </div>
                   <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-text-muted">
                     <span className="tnum" title={alert.ts}>
-                      {formatDateTime(alert.ts, branding.locale)} · {timeAgo(alert.ts)}
+                      {formatDateTime(alert.ts, branding.locale)} · {timeAgo(alert.ts, branding.locale)}
                     </span>
                     {alert.door_name && (
                       <span className="inline-flex items-center gap-1">
@@ -275,8 +270,10 @@ export default function AlertsPage() {
                     {alert.acknowledged && (
                       <span className="inline-flex items-center gap-1 text-primary">
                         <Check className="h-3 w-3" />
-                        Acquittée
-                        {alert.acknowledged_by_email ? ` par ${alert.acknowledged_by_email}` : ""}
+                        {t("alerts.acked")}
+                        {alert.acknowledged_by_email
+                          ? ` ${t("alerts.ackedBy", { email: alert.acknowledged_by_email })}`
+                          : ""}
                       </span>
                     )}
                   </p>
@@ -294,7 +291,7 @@ export default function AlertsPage() {
                     ) : (
                       <Check className="h-3.5 w-3.5" />
                     )}
-                    Acquitter
+                    {t("alerts.ack")}
                   </button>
                 )}
               </li>
@@ -308,14 +305,9 @@ export default function AlertsPage() {
         onClose={() => setConfirmAll(false)}
         onConfirm={ackAll}
         tone="primary"
-        title="Tout acquitter"
-        confirmLabel="Acquitter tout"
-        description={
-          <p>
-            Marquer <span className="tnum font-medium text-text">{unackCount}</span> alerte(s)
-            comme acquittée(s) ? L&apos;action est tracée dans le journal d&apos;audit.
-          </p>
-        }
+        title={t("alerts.ackAll")}
+        confirmLabel={t("alerts.ackAll.confirm")}
+        description={<p>{t("alerts.ackAll.desc", { n: unackCount })}</p>}
       />
     </div>
   );

@@ -16,7 +16,7 @@ import { RefreshCw, CheckCircle2 } from "lucide-react";
 import { Dialog } from "./Dialog";
 import { FormField, FormError, Toggle } from "./FormField";
 import { createDoor, updateDoor } from "@/lib/api";
-import type { Door, DoorDirection, DoorDraft, DoorDriver } from "@/lib/types";
+import type { Door, DoorDirection, DoorDraft, DoorDriver, Zone } from "@/lib/types";
 
 const DRIVERS: { value: DoorDriver; label: string }[] = [
   { value: "webhook", label: "Webhook" },
@@ -39,6 +39,7 @@ type Form = {
   driver: DoorDriver;
   relock_seconds: string;
   enabled: boolean;
+  zone_id: string;
   // driver_config fields
   webhook_url: string;
   webhook_method: string;
@@ -53,6 +54,7 @@ const EMPTY: Form = {
   driver: "simulation",
   relock_seconds: "5",
   enabled: true,
+  zone_id: "",
   webhook_url: "",
   webhook_method: "POST",
   gpio_pin: "17",
@@ -69,6 +71,7 @@ function toForm(door: Door | null): Form {
     driver: door.driver,
     relock_seconds: String(door.relock_seconds ?? 5),
     enabled: door.enabled,
+    zone_id: door.zone_id ?? "",
     webhook_url: typeof cfg.url === "string" ? cfg.url : "",
     webhook_method: typeof cfg.method === "string" ? cfg.method : "POST",
     gpio_pin: cfg.pin != null ? String(cfg.pin) : "17",
@@ -89,11 +92,13 @@ function buildConfig(form: Form): Record<string, unknown> {
 export function DoorDialog({
   open,
   door,
+  zones = [],
   onClose,
   onSaved,
 }: {
   open: boolean;
   door: Door | null;
+  zones?: Zone[];
   onClose: () => void;
   onSaved: (door: Door) => void;
 }) {
@@ -142,6 +147,7 @@ export function DoorDialog({
       driver_config: buildConfig(form),
       relock_seconds: relock,
       enabled: form.enabled,
+      zone_id: form.zone_id || undefined,
     };
 
     setSubmitting(true);
@@ -232,6 +238,24 @@ export function DoorDialog({
             />
           </FormField>
         </div>
+
+        <FormField
+          label="Zone"
+          hint="La zone à laquelle appartient cette porte (chaîne caméra → porte → zone)."
+        >
+          <select
+            className="field w-full px-3 py-2 text-sm"
+            value={form.zone_id}
+            onChange={(e) => set("zone_id", e.target.value)}
+          >
+            <option value="">Aucune zone</option>
+            {zones.map((z) => (
+              <option key={z.id} value={z.id}>
+                {z.name}
+              </option>
+            ))}
+          </select>
+        </FormField>
 
         <FormField label="Pilote d'ouverture">
           <select

@@ -18,6 +18,7 @@ import type {
   Alert,
   AlertKind,
   AlertQuery,
+  AskResult,
   AttendanceDay,
   AuditEntry,
   AuditQuery,
@@ -25,20 +26,30 @@ import type {
   Camera,
   DepartmentReport,
   Door,
+  EnergyPeriod,
+  EnergyRule,
+  EnergyRuleDraft,
+  EnergySummary,
   Insight,
+  Locale,
   Member,
   MemberReport,
+  MemberTimeline,
   OperatorUser,
   PresenceNow,
   ReportSort,
   ReportsDaily,
   ReportsSummary,
   Settings,
+  TimelineStep,
   TodayStats,
   UserDraft,
   UserPatch,
+  Zone,
+  ZoneDraft,
+  ZoneOccupancy,
 } from "./types";
-import { shiftDate, todayISO } from "./utils";
+import { formatDuration, formatTime, shiftDate, todayISO } from "./utils";
 
 /**
  * Stable id generator for newly-created mock rows. Uses crypto.randomUUID when
@@ -152,6 +163,7 @@ export const MOCK_DOORS: Door[] = [
     driver_config: { url: "http://10.0.0.20/relay", method: "POST" },
     relock_seconds: 5,
     enabled: true,
+    zone_id: uuid(503), // Hall d'accueil
     created_at: iso(-1000 * 60 * 60 * 24 * 120),
   },
   {
@@ -163,6 +175,7 @@ export const MOCK_DOORS: Door[] = [
     driver_config: { pin: 17, active_high: true },
     relock_seconds: 8,
     enabled: true,
+    zone_id: uuid(507), // Parking
     created_at: iso(-1000 * 60 * 60 * 24 * 110),
   },
   {
@@ -174,6 +187,7 @@ export const MOCK_DOORS: Door[] = [
     driver_config: {},
     relock_seconds: 3,
     enabled: true,
+    zone_id: uuid(505), // Zone sécurisée
     created_at: iso(-1000 * 60 * 60 * 24 * 90),
   },
   {
@@ -185,6 +199,7 @@ export const MOCK_DOORS: Door[] = [
     driver_config: {},
     relock_seconds: 5,
     enabled: false,
+    zone_id: uuid(503), // Hall d'accueil
     created_at: iso(-1000 * 60 * 60 * 24 * 80),
   },
 ];
@@ -1051,13 +1066,18 @@ export function mockReportsMembers(
 }
 
 // --------------------------------------------------------------------------
-// Presence — who is on site right now, derived from today's attendance.
+// Presence — who is on site right now, derived from today's attendance. v3
+// attaches each person's current zone (see zoneForMember below) and honours the
+// `zone_id` filter (descendants included), so the Live Map, the muster view and
+// the Ask engine all read the same spatial truth.
 // --------------------------------------------------------------------------
-export function mockPresenceNow(): PresenceNow {
+export function mockPresenceNow(zoneId?: string): PresenceNow {
   const memberById = new Map(liveMembers.map((m) => [m.id, m]));
-  const people = MOCK_ATTENDANCE.filter(isOnSiteNow)
+  const nameById = new Map(liveZones.map((z) => [z.id, z.name]));
+  let people = MOCK_ATTENDANCE.filter(isOnSiteNow)
     .map((a, i) => {
       const member = memberById.get(a.member_id);
+      const zone = zoneForMember(member, nameById);
       return {
         member_id: a.member_id,
         member_name: a.member_name,
@@ -1065,9 +1085,15 @@ export function mockPresenceNow(): PresenceNow {
         member_type: member?.member_type ?? ("employee" as const),
         first_in_ts: a.first_in_ts as string,
         first_in_door_name: MOCK_DOORS[i % 2].name, // the two street-level doors
+        zone_id: zone?.id,
+        zone_name: zone?.name,
       };
     })
     .sort((a, b) => +new Date(a.first_in_ts) - +new Date(b.first_in_ts));
+  if (zoneId) {
+    const allowed = zoneDescendantsLive(zoneId); // includes the zone itself
+    people = people.filter((p) => p.zone_id != null && allowed.has(p.zone_id));
+  }
   return { count: people.length, people };
 }
 
@@ -1129,4 +1155,760 @@ export function mockInsights(limit = 10): Insight[] {
     },
   ];
   return insights.slice(0, Math.max(0, limit));
+}
+
+// ===========================================================================
+// v3 — Spatial Intelligence mocks (zones · energy · movement)
+// A believable single building (Bâtiment A) with floors + areas, doors bound
+// to areas, occupancy-driven energy rules, and per-member movement timelines.
+// Everything mutates in-memory so the demo behaves like the real API.
+// ===========================================================================
+
+const DAY_MS = 1000 * 60 * 60 * 24;
+
+// --------------------------------------------------------------------------
+// Zones — the auto-layout zone tree the /map + admin render. Door zone_ids in
+// MOCK_DOORS above reference these exact ids (uuid(501..507)).
+// --------------------------------------------------------------------------
+export const MOCK_ZONES: Zone[] = [
+  { id: uuid(501), name: "Bâtiment A", kind: "building", capacity: 120, created_at: iso(-DAY_MS * 130) },
+  { id: uuid(502), name: "Rez-de-chaussée", kind: "floor", parent_id: uuid(501), capacity: 60, created_at: iso(-DAY_MS * 130) },
+  { id: uuid(503), name: "Hall d'accueil", kind: "area", parent_id: uuid(502), capacity: 40, energy_kw: 6.5, created_at: iso(-DAY_MS * 130) },
+  { id: uuid(504), name: "1er étage", kind: "floor", parent_id: uuid(501), capacity: 28, energy_kw: 8, created_at: iso(-DAY_MS * 128) },
+  { id: uuid(505), name: "Zone sécurisée", kind: "area", parent_id: uuid(504), capacity: 6, energy_kw: 3.2, created_at: iso(-DAY_MS * 128) },
+  { id: uuid(506), name: "Sous-sol", kind: "floor", parent_id: uuid(501), capacity: 30, created_at: iso(-DAY_MS * 126) },
+  { id: uuid(507), name: "Parking", kind: "area", parent_id: uuid(506), capacity: 30, energy_kw: 12, created_at: iso(-DAY_MS * 126) },
+];
+
+let liveZones: Zone[] = MOCK_ZONES.map((z) => ({ ...z }));
+
+export function getMockZones(): Zone[] {
+  return liveZones.map((z) => ({ ...z }));
+}
+
+export function addMockZone(draft: ZoneDraft): Zone {
+  const zone: Zone = {
+    id: mockId(),
+    name: draft.name,
+    kind: draft.kind,
+    parent_id: draft.parent_id || undefined,
+    capacity: draft.capacity ?? undefined,
+    energy_kw: draft.energy_kw ?? undefined,
+    created_at: new Date().toISOString(),
+  };
+  liveZones = [...liveZones, zone];
+  appendMockAudit("zone.create", "zone", zone.id, { name: zone.name, kind: zone.kind });
+  return { ...zone };
+}
+
+export function updateMockZone(id: string, patch: Partial<ZoneDraft>): Zone {
+  const idx = liveZones.findIndex((z) => z.id === id);
+  if (idx === -1) throw new Error("Zone not found");
+  const next: Zone = {
+    ...liveZones[idx],
+    ...patch,
+    parent_id: "parent_id" in patch ? patch.parent_id || undefined : liveZones[idx].parent_id,
+    capacity: "capacity" in patch ? patch.capacity ?? undefined : liveZones[idx].capacity,
+    energy_kw: "energy_kw" in patch ? patch.energy_kw ?? undefined : liveZones[idx].energy_kw,
+    id,
+  };
+  liveZones = liveZones.map((z) => (z.id === id ? next : z));
+  appendMockAudit("zone.update", "zone", id, { changed: Object.keys(patch) });
+  return { ...next };
+}
+
+export function deleteMockZone(id: string): void {
+  // Schema: doors.zone_id & zones.parent_id ON DELETE SET NULL; energy_rules CASCADE.
+  liveZones = liveZones
+    .filter((z) => z.id !== id)
+    .map((z) => (z.parent_id === id ? { ...z, parent_id: undefined } : z));
+  liveDoors = liveDoors.map((d) => (d.zone_id === id ? { ...d, zone_id: undefined } : d));
+  liveEnergyRules = liveEnergyRules.filter((r) => r.zone_id !== id);
+  appendMockAudit("zone.delete", "zone", id);
+}
+
+// --------------------------------------------------------------------------
+// Energy rules — occupancy-driven automation. A couple of zones sit OFF now
+// (empty out of hours) so the savings card and per-rule table show both states.
+// --------------------------------------------------------------------------
+export const MOCK_ENERGY_RULES: EnergyRule[] = [
+  {
+    id: uuid(601),
+    zone_id: uuid(507), // Parking
+    name: "Extinction Parking",
+    empty_minutes: 20,
+    driver: "simulation",
+    driver_config: {},
+    enabled: true,
+    state: "off",
+    last_changed: iso(-1000 * 60 * 60 * 7),
+    created_at: iso(-DAY_MS * 40),
+  },
+  {
+    id: uuid(602),
+    zone_id: uuid(503), // Hall d'accueil
+    name: "Éclairage Hall",
+    empty_minutes: 15,
+    driver: "webhook",
+    driver_config: { url: "http://10.0.0.40/relay/lighting", method: "POST", on_on: "1", on_off: "0" },
+    enabled: true,
+    state: "on",
+    last_changed: iso(-1000 * 60 * 60 * 2),
+    created_at: iso(-DAY_MS * 38),
+  },
+  {
+    id: uuid(603),
+    zone_id: uuid(505), // Zone sécurisée
+    name: "CVC — Zone sécurisée",
+    empty_minutes: 30,
+    driver: "simulation",
+    driver_config: {},
+    enabled: true,
+    state: "off",
+    last_changed: iso(-1000 * 60 * 90),
+    created_at: iso(-DAY_MS * 30),
+  },
+  {
+    id: uuid(604),
+    zone_id: uuid(504), // 1er étage
+    name: "Éclairage 1er étage",
+    empty_minutes: 25,
+    driver: "simulation",
+    driver_config: {},
+    enabled: false,
+    state: "on",
+    last_changed: undefined,
+    created_at: iso(-DAY_MS * 20),
+  },
+];
+
+let liveEnergyRules: EnergyRule[] = MOCK_ENERGY_RULES.map((r) => ({ ...r }));
+
+export function getMockEnergyRules(): EnergyRule[] {
+  return liveEnergyRules.map((r) => ({ ...r }));
+}
+
+export function addMockEnergyRule(draft: EnergyRuleDraft): EnergyRule {
+  const rule: EnergyRule = {
+    id: mockId(),
+    zone_id: draft.zone_id,
+    name: draft.name,
+    empty_minutes: draft.empty_minutes,
+    driver: draft.driver,
+    driver_config: { ...draft.driver_config },
+    enabled: draft.enabled,
+    state: "on",
+    last_changed: undefined,
+    created_at: new Date().toISOString(),
+  };
+  liveEnergyRules = [...liveEnergyRules, rule];
+  appendMockAudit("energy_rule.create", "energy_rule", rule.id, { name: rule.name });
+  return { ...rule };
+}
+
+export function updateMockEnergyRule(id: string, patch: Partial<EnergyRuleDraft>): EnergyRule {
+  const idx = liveEnergyRules.findIndex((r) => r.id === id);
+  if (idx === -1) throw new Error("Energy rule not found");
+  const next: EnergyRule = {
+    ...liveEnergyRules[idx],
+    ...patch,
+    driver_config: patch.driver_config
+      ? { ...patch.driver_config }
+      : liveEnergyRules[idx].driver_config,
+    id,
+  };
+  liveEnergyRules = liveEnergyRules.map((r) => (r.id === id ? next : r));
+  appendMockAudit("energy_rule.update", "energy_rule", id, { changed: Object.keys(patch) });
+  return { ...next };
+}
+
+export function deleteMockEnergyRule(id: string): void {
+  liveEnergyRules = liveEnergyRules.filter((r) => r.id !== id);
+  appendMockAudit("energy_rule.delete", "energy_rule", id);
+}
+
+/**
+ * Savings tally over the period. kWh = zone.energy_kw × hours the zone was OFF.
+ * Deterministic per rule so the card and per-rule table always agree.
+ */
+export function mockEnergySummary(period: EnergyPeriod = "month"): EnergySummary {
+  const days = period === "today" ? 1 : period === "week" ? 7 : 30;
+  const zoneById = new Map(liveZones.map((z) => [z.id, z]));
+  const per_rule = liveEnergyRules.map((r) => {
+    const zone = zoneById.get(r.zone_id);
+    const kw = Number(zone?.energy_kw ?? 0);
+    // Roughly 8–12 empty (off) hours accrue per day out of hours; disabled
+    // rules still show the small savings banked before they were paused.
+    const nightly = 8 + seededInt(`${r.id}-off`, 5);
+    const hours_off = Math.round(nightly * days * (r.enabled ? 1 : 0.35) * 10) / 10;
+    const kwh_saved = Math.round(kw * hours_off * 10) / 10;
+    return {
+      rule_id: r.id,
+      name: r.name,
+      zone_id: r.zone_id,
+      zone_name: zone?.name,
+      driver: r.driver,
+      enabled: r.enabled,
+      state: r.state,
+      last_changed: r.last_changed,
+      hours_off,
+      kwh_saved,
+    };
+  });
+  const off_now = liveEnergyRules.filter((r) => r.state === "off").length;
+  const kwh_saved = Math.round(per_rule.reduce((s, r) => s + r.kwh_saved, 0) * 10) / 10;
+  const hours_off = Math.round(per_rule.reduce((s, r) => s + r.hours_off, 0) * 10) / 10;
+  return { rules: liveEnergyRules.length, off_now, hours_off, kwh_saved, per_rule };
+}
+
+// --------------------------------------------------------------------------
+// Movement timeline — a member's door crossings for a day, at zone granularity.
+// Bookended by their attendance first-in / last-out so it stays consistent with
+// the rest of the demo. Granted only by default; `all` adds a denied attempt.
+// --------------------------------------------------------------------------
+export function mockMemberTimeline(memberId: string, date: string, all = false): MemberTimeline {
+  const member = liveMembers.find((m) => m.id === memberId);
+  const base = { id: memberId, full_name: member?.full_name ?? "—", department: member?.department };
+  const day = mockAttendanceFor({ date, member_id: memberId })[0];
+  const steps: TimelineStep[] = [];
+  if (!day || !day.first_in_ts) return { member: base, date, steps };
+
+  const zoneName = (zid?: string) => liveZones.find((z) => z.id === zid)?.name;
+  const doorZone = (d?: Door) => (d ? zoneName(d.zone_id) : undefined);
+  const mainDoor = liveDoors.find((d) => /principale/i.test(d.name)) ?? liveDoors[0];
+  const secureDoor = liveDoors.find((d) => /coffre/i.test(d.name)) ?? liveDoors[2] ?? mainDoor;
+  const firstIn = new Date(day.first_in_ts).getTime();
+
+  const push = (
+    offsetMin: number,
+    door: Door | undefined,
+    direction: TimelineStep["direction"],
+    decision: TimelineStep["decision"] = "granted",
+  ) => {
+    if (!door) return;
+    steps.push({
+      ts: new Date(firstIn + offsetMin * 60000).toISOString(),
+      door_name: door.name,
+      zone_name: doorZone(door),
+      direction,
+      decision,
+    });
+  };
+
+  push(0, mainDoor, "in");
+  push(38, secureDoor, "in");
+  push(56, secureDoor, "out");
+  push(232, mainDoor, "out"); // lunch out
+  push(279, mainDoor, "in"); // back from lunch
+  if (all) push(298, secureDoor, "in", "off_schedule");
+
+  if (day.last_out_ts) {
+    steps.push({
+      ts: new Date(day.last_out_ts).toISOString(),
+      door_name: mainDoor.name,
+      zone_name: doorZone(mainDoor),
+      direction: "out",
+      decision: "granted",
+    });
+  }
+
+  const filtered = all ? steps : steps.filter((s) => s.decision === "granted");
+  filtered.sort((a, b) => +new Date(a.ts) - +new Date(b.ts));
+  return { member: base, date, steps: filtered };
+}
+
+// ===========================================================================
+// v3 — Live Map + Ask mocks (this module's half of Spatial Intelligence).
+//
+// The sibling seeded a single building (Bâtiment A, ids 501–507). We extend the
+// demo estate with a second building so the Live Map reads as a campus and the
+// contract's headline Ask example — "Qui est dans le Bâtiment B ?" — answers
+// with real people. Appending to `liveZones` keeps every existing door/energy
+// binding (503/505/507, energy rules 601–604) intact.
+// ===========================================================================
+
+const MOCK_ZONES_B: Zone[] = [
+  { id: uuid(508), name: "Bâtiment B", kind: "building", capacity: 90, created_at: iso(-DAY_MS * 120) },
+  { id: uuid(509), name: "RDC — Ateliers", kind: "floor", parent_id: uuid(508), capacity: 50, energy_kw: 14, created_at: iso(-DAY_MS * 120) },
+  { id: uuid(510), name: "Atelier principal", kind: "area", parent_id: uuid(509), capacity: 24, energy_kw: 9, created_at: iso(-DAY_MS * 120) },
+  { id: uuid(511), name: "Entrepôt", kind: "area", parent_id: uuid(509), capacity: 20, energy_kw: 11, created_at: iso(-DAY_MS * 120) },
+  { id: uuid(512), name: "1er étage — Bureaux", kind: "floor", parent_id: uuid(508), capacity: 30, energy_kw: 8, created_at: iso(-DAY_MS * 118) },
+  { id: uuid(513), name: "Open space IT", kind: "area", parent_id: uuid(512), capacity: 24, energy_kw: 4, created_at: iso(-DAY_MS * 118) },
+  { id: uuid(514), name: "PC Sécurité", kind: "area", parent_id: uuid(512), capacity: 8, energy_kw: 3, created_at: iso(-DAY_MS * 118) },
+];
+// Register Bâtiment B once, at module load (idempotent against re-import).
+if (!liveZones.some((z) => z.id === uuid(508))) {
+  liveZones = [...liveZones, ...MOCK_ZONES_B.map((z) => ({ ...z }))];
+}
+
+// --------------------------------------------------------------------------
+// Where each person is "now" — the zone of the door of their most recent
+// granted event. The mock derives it deterministically from the department so
+// the map, the muster and Ask stay internally consistent (and Bâtiment B fills
+// up). Leaf-area ids: 503 Hall · 505 Zone sécurisée · 507 Parking (A) ·
+// 510 Atelier · 511 Entrepôt · 513 Open space IT · 514 PC Sécurité (B).
+// --------------------------------------------------------------------------
+const DEFAULT_ZONE_ID = uuid(503); // Hall d'accueil
+const DEPARTMENT_ZONE: Record<string, string> = {
+  "Accueil": uuid(503),
+  "Visiteurs": uuid(503),
+  "Ressources Humaines": uuid(503),
+  "Finance": uuid(505),
+  "Direction": uuid(505),
+  "Prestataires": uuid(507),
+  "Opérations": uuid(510),
+  "IT": uuid(513),
+  "Sécurité": uuid(514),
+};
+
+function zoneForMember(
+  member: Member | undefined,
+  nameById: Map<string, string>,
+): { id: string; name: string } | undefined {
+  if (!member) return undefined;
+  let id = (member.department && DEPARTMENT_ZONE[member.department]) || DEFAULT_ZONE_ID;
+  // Fall back gracefully if a zone was renamed/deleted via the admin CRUD.
+  if (!nameById.has(id)) id = nameById.has(DEFAULT_ZONE_ID) ? DEFAULT_ZONE_ID : liveZones[0]?.id ?? id;
+  const name = nameById.get(id);
+  return name ? { id, name } : undefined;
+}
+
+/** Set of a zone's id plus every descendant id (built from live zones). */
+function zoneDescendantsLive(id: string): Set<string> {
+  const childrenOf = new Map<string, string[]>();
+  for (const z of liveZones) {
+    if (z.parent_id) childrenOf.set(z.parent_id, [...(childrenOf.get(z.parent_id) ?? []), z.id]);
+  }
+  const out = new Set<string>([id]);
+  const stack = [id];
+  while (stack.length) {
+    const cur = stack.pop() as string;
+    for (const child of childrenOf.get(cur) ?? []) {
+      if (!out.has(child)) {
+        out.add(child);
+        stack.push(child);
+      }
+    }
+  }
+  return out;
+}
+
+// Recent granted-entry pressure per leaf zone (last 15 min). Deterministic; the
+// Hall and the Atelier run hot so the map shows congestion badges. Roll-up to
+// floors/buildings is the sum of descendant leaves.
+const CONGESTION_BASE: Record<string, number> = {
+  [uuid(503)]: 12, // Hall — high throughput doorway
+  [uuid(505)]: 2,
+  [uuid(507)]: 3,
+  [uuid(510)]: 8, // Atelier — busy shift change
+  [uuid(511)]: 1,
+  [uuid(513)]: 2,
+  [uuid(514)]: 1,
+};
+
+/**
+ * `GET /api/zones/occupancy`. `count` and `congestion` roll up over descendants
+ * (a building includes its floors' areas), so tinting a plinth and its slabs
+ * both read correctly. Derived from the same presence assignment as the dots.
+ */
+export function mockZoneOccupancy(): ZoneOccupancy[] {
+  const people = mockPresenceNow().people;
+  const direct = new Map<string, number>();
+  for (const p of people) {
+    if (p.zone_id) direct.set(p.zone_id, (direct.get(p.zone_id) ?? 0) + 1);
+  }
+  return liveZones.map((z) => {
+    const desc = zoneDescendantsLive(z.id);
+    let count = 0;
+    let congestion = 0;
+    for (const id of desc) {
+      count += direct.get(id) ?? 0;
+      congestion += CONGESTION_BASE[id] ?? 0;
+    }
+    return {
+      zone_id: z.id,
+      name: z.name,
+      kind: z.kind,
+      parent_id: z.parent_id,
+      count,
+      capacity: z.capacity,
+      congestion,
+    };
+  });
+}
+
+// ===========================================================================
+// Ask — the deterministic, on-prem intent parser (no LLM, no cloud). It answers
+// the same questions the real API does, over the mock data, so the demo fields
+// real questions with NO backend. Results localise by the settings locale.
+// ===========================================================================
+
+/** Lowercase + strip accents so FR/EN/AR patterns match a common form. */
+function askNorm(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .trim();
+}
+
+type AskL10n = {
+  colPerson: string;
+  colDept: string;
+  colLate: string;
+  colZone: string;
+  colTime: string;
+  colDir: string;
+  colDoor: string;
+  colOvertime: string;
+  colMembers: string;
+  titleLate: (n: number, period: string) => string;
+  titleInside: (zone: string) => string;
+  emptyInside: (zone: string) => string;
+  noZone: (q: string) => string;
+  titleOvertime: (period: string) => string;
+  titleOnsite: (n: number) => string;
+  titleAbsent: string;
+  titleEarliest: string;
+  titleTimeline: (name: string) => string;
+  noMember: (q: string) => string;
+  unknownTitle: string;
+  unknownHint: string;
+  none: string;
+  pMonth: string;
+  pWeek: string;
+  pToday: string;
+  dir: (d: string) => string;
+};
+
+const ASK_SUGGESTIONS: Record<Locale, string[]> = {
+  fr: [
+    "Qui a été en retard plus de 5 fois ce mois-ci ?",
+    "Qui est dans le Bâtiment B ?",
+    "Quels départements ont le plus d'heures sup ?",
+    "Qui est sur site maintenant ?",
+    "Qui est absent aujourd'hui ?",
+    "Premières arrivées aujourd'hui",
+  ],
+  en: [
+    "Who has been late more than 5 times this month?",
+    "Who is inside Bâtiment B?",
+    "Which departments have the most overtime?",
+    "Who is on site now?",
+    "Who is absent today?",
+    "Earliest arrivals today",
+  ],
+  ar: [
+    "من تأخّر أكثر من 5 مرات هذا الشهر؟",
+    "من داخل Bâtiment B؟",
+    "أي الأقسام لديها أكبر عدد من ساعات العمل الإضافي؟",
+    "من في الموقع الآن؟",
+    "من الغائب اليوم؟",
+    "أبكر الحضور اليوم",
+  ],
+};
+
+const ASK_DICT: Record<Locale, AskL10n> = {
+  fr: {
+    colPerson: "Personne",
+    colDept: "Département",
+    colLate: "Retards",
+    colZone: "Zone",
+    colTime: "Heure",
+    colDir: "Sens",
+    colDoor: "Porte",
+    colOvertime: "Heures sup",
+    colMembers: "Membres",
+    titleLate: (n, p) =>
+      n > 0 ? `En retard plus de ${n} fois — ${p}` : `Retards — ${p}`,
+    titleInside: (z) => `Dans ${z}`,
+    emptyInside: (z) => `Personne actuellement dans ${z}.`,
+    noZone: (q) => `Aucune zone ne correspond à « ${q} ».`,
+    titleOvertime: (p) => `Heures supplémentaires par département — ${p}`,
+    titleOnsite: (n) => `Sur site actuellement — ${n} personne${n > 1 ? "s" : ""}`,
+    titleAbsent: "Absents aujourd'hui",
+    titleEarliest: "Premières arrivées aujourd'hui",
+    titleTimeline: (name) => `Parcours de ${name}`,
+    noMember: (q) => `Aucune personne ne correspond à « ${q} ».`,
+    unknownTitle: "Question non comprise",
+    unknownHint: "Essayez l'une de ces questions :",
+    none: "Aucun résultat.",
+    pMonth: "ce mois-ci",
+    pWeek: "cette semaine",
+    pToday: "aujourd'hui",
+    dir: (d) => (d === "in" ? "Entrée" : d === "out" ? "Sortie" : "—"),
+  },
+  en: {
+    colPerson: "Person",
+    colDept: "Department",
+    colLate: "Late days",
+    colZone: "Zone",
+    colTime: "Time",
+    colDir: "Direction",
+    colDoor: "Door",
+    colOvertime: "Overtime",
+    colMembers: "Members",
+    titleLate: (n, p) =>
+      n > 0 ? `Late more than ${n} times — ${p}` : `Late arrivals — ${p}`,
+    titleInside: (z) => `Inside ${z}`,
+    emptyInside: (z) => `Nobody is currently inside ${z}.`,
+    noZone: (q) => `No zone matches "${q}".`,
+    titleOvertime: (p) => `Overtime by department — ${p}`,
+    titleOnsite: (n) => `On site now — ${n} ${n === 1 ? "person" : "people"}`,
+    titleAbsent: "Absent today",
+    titleEarliest: "Earliest arrivals today",
+    titleTimeline: (name) => `${name}'s movements`,
+    noMember: (q) => `No person matches "${q}".`,
+    unknownTitle: "Question not understood",
+    unknownHint: "Try one of these questions:",
+    none: "No results.",
+    pMonth: "this month",
+    pWeek: "this week",
+    pToday: "today",
+    dir: (d) => (d === "in" ? "In" : d === "out" ? "Out" : "—"),
+  },
+  ar: {
+    colPerson: "الشخص",
+    colDept: "القسم",
+    colLate: "مرات التأخّر",
+    colZone: "المنطقة",
+    colTime: "الوقت",
+    colDir: "الاتجاه",
+    colDoor: "الباب",
+    colOvertime: "ساعات إضافية",
+    colMembers: "الأعضاء",
+    titleLate: (n, p) =>
+      n > 0 ? `تأخّر أكثر من ${n} مرات — ${p}` : `حالات التأخّر — ${p}`,
+    titleInside: (z) => `داخل ${z}`,
+    emptyInside: (z) => `لا أحد داخل ${z} حالياً.`,
+    noZone: (q) => `لا توجد منطقة تطابق «${q}».`,
+    titleOvertime: (p) => `الساعات الإضافية حسب القسم — ${p}`,
+    titleOnsite: (n) => `في الموقع الآن — ${n} شخص`,
+    titleAbsent: "الغائبون اليوم",
+    titleEarliest: "أبكر الحضور اليوم",
+    titleTimeline: (name) => `تنقّلات ${name}`,
+    noMember: (q) => `لا يوجد شخص يطابق «${q}».`,
+    unknownTitle: "لم يتم فهم السؤال",
+    unknownHint: "جرّب أحد هذه الأسئلة:",
+    none: "لا نتائج.",
+    pMonth: "هذا الشهر",
+    pWeek: "هذا الأسبوع",
+    pToday: "اليوم",
+    dir: (d) => (d === "in" ? "دخول" : d === "out" ? "خروج" : "—"),
+  },
+};
+
+const ZONE_STOPWORDS = new Set([
+  "batiment", "building", "buildings", "batiments", "etage", "floor", "niveau",
+  "zone", "area", "salle", "room", "espace", "open", "space", "secteur", "de",
+  "du", "des", "d", "the", "le", "la", "les", "l", "المبنى", "الطابق", "منطقة",
+]);
+
+function askZoneTokens(s: string): string[] {
+  return askNorm(s)
+    .split(/[^a-z0-9؀-ۿ]+/)
+    .filter((t) => t && !ZONE_STOPWORDS.has(t));
+}
+
+function askMatchZone(phrase: string): { id: string; name: string } | null {
+  const qt = askZoneTokens(phrase);
+  if (!qt.length) return null;
+  let best: Zone | null = null;
+  let bestScore = 0;
+  for (const z of liveZones) {
+    const zt = new Set(askZoneTokens(z.name));
+    let score = qt.reduce((s, t) => s + (zt.has(t) ? 1 : 0), 0);
+    if (score > 0 && phrase.length > 1 && askNorm(z.name).includes(askNorm(phrase))) score += 2;
+    if (score > 0) score += z.kind === "building" ? 0.3 : z.kind === "floor" ? 0.2 : 0.1;
+    if (score > bestScore) {
+      bestScore = score;
+      best = z;
+    }
+  }
+  return best && bestScore >= 1 ? { id: best.id, name: best.name } : null;
+}
+
+function askMatchMember(name: string): Member | null {
+  const qt = askNorm(name).split(/[^a-z0-9]+/).filter(Boolean);
+  if (!qt.length) return null;
+  let best: Member | null = null;
+  let bestScore = 0;
+  for (const m of liveMembers) {
+    const mt = new Set(askNorm(m.full_name).split(/[^a-z0-9]+/).filter(Boolean));
+    const score = qt.reduce((s, t) => s + (mt.has(t) ? 1 : 0), 0);
+    if (score > bestScore) {
+      bestScore = score;
+      best = m;
+    }
+  }
+  return bestScore >= 1 ? best : null;
+}
+
+function askExtractZonePhrase(n: string): string {
+  const m = n.match(/(?:dans|inside|داخل|في|in)\s+(.*)$/);
+  const p = m ? m[1] : n;
+  return p.replace(/[?.!؟]/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function askExtractTimelineName(n: string): string | null {
+  const m = n.match(
+    /(?:parcours|trajet|itineraire|historique|deplacements|timeline|movements?|where has|where did|ou est alle|ou est passe|مسار|تنقلات)\s+(?:de |d |of |du |des |for )?(.+)$/,
+  );
+  if (!m) return null;
+  const name = m[1]
+    .replace(/[?.!؟]/g, " ")
+    .replace(/\b(been|gone|today|aujourd|hui)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return name || null;
+}
+
+function askParsePeriod(n: string, today: string, L: AskL10n): { from: string; to: string; label: string } {
+  if (/aujourd|today|اليوم/.test(n)) return { from: today, to: today, label: L.pToday };
+  if (/semaine|this week|\bweek\b|الاسبوع|اسبوع/.test(n)) {
+    return { from: shiftDate(today, -6), to: today, label: L.pWeek };
+  }
+  return { from: `${today.slice(0, 8)}01`, to: today, label: L.pMonth };
+}
+
+/**
+ * The parser. Deterministic and side-effect-free. Detection order matters:
+ * more specific intents (timeline, zone) are tested before broad ones.
+ */
+export function mockAsk(q: string): AskResult {
+  const locale = (getMockSettings().branding.locale ?? "fr") as Locale;
+  const L = ASK_DICT[locale] ?? ASK_DICT.fr;
+  const suggestions = ASK_SUGGESTIONS[locale] ?? ASK_SUGGESTIONS.fr;
+  const raw = q.trim();
+  const n = askNorm(raw);
+  const today = todayISO();
+
+  if (!n) return { intent: "unknown", title: L.unknownTitle, text: L.unknownHint, suggestions };
+
+  const period = askParsePeriod(n, today, L);
+
+  // 1. member_timeline — "Parcours de …" / "…'s movements"
+  const tlName = askExtractTimelineName(n);
+  if (tlName) {
+    const member = askMatchMember(tlName);
+    if (member) {
+      const tl = mockMemberTimeline(member.id, today, false);
+      if (!tl.steps.length) {
+        return { intent: "member_timeline", title: L.titleTimeline(member.full_name), text: L.none };
+      }
+      return {
+        intent: "member_timeline",
+        title: L.titleTimeline(member.full_name),
+        columns: [L.colTime, L.colDoor, L.colZone, L.colDir],
+        rows: tl.steps.map((s) => [
+          formatTime(s.ts, locale),
+          s.door_name ?? "—",
+          s.zone_name ?? "—",
+          L.dir(s.direction),
+        ]),
+      };
+    }
+    return { intent: "member_timeline", title: L.titleTimeline(tlName), text: L.noMember(tlName), suggestions };
+  }
+
+  // 2. inside_zone — "Qui est dans le Bâtiment B ?"
+  const insideHit =
+    /\bdans\b|\binside\b|داخل|qui se trouve|who is in\b|show everyone/.test(n) &&
+    !/retard|\blate\b|heures? sup|overtime|absent/.test(n);
+  if (insideHit) {
+    const zone = askMatchZone(askExtractZonePhrase(n));
+    if (zone) {
+      const ppl = mockPresenceNow(zone.id).people;
+      if (!ppl.length) return { intent: "inside_zone", title: L.titleInside(zone.name), text: L.emptyInside(zone.name) };
+      return {
+        intent: "inside_zone",
+        title: L.titleInside(zone.name),
+        columns: [L.colPerson, L.colDept, L.colZone, L.colTime],
+        rows: ppl.map((p) => [
+          p.member_name,
+          p.department ?? "—",
+          p.zone_name ?? "—",
+          formatTime(p.first_in_ts, locale),
+        ]),
+      };
+    }
+    return {
+      intent: "inside_zone",
+      title: L.unknownTitle,
+      text: L.noZone(raw),
+      suggestions: liveZones.filter((z) => z.kind !== "floor").map((z) => z.name).slice(0, 6),
+    };
+  }
+
+  // 3. late_count — "Qui a été en retard plus de N fois ce mois-ci ?"
+  if (/retard|\blate\b|تاخر|متاخر/.test(n)) {
+    const num =
+      n.match(/(?:plus de|more than|over|>\s?)\s*(\d+)/) ||
+      n.match(/(\d+)\s*(?:fois|times|مرات|مره)/) ||
+      n.match(/(\d+)/);
+    const threshold = num ? parseInt(num[1], 10) : 0;
+    const rows = mockReportsMembers(period.from, period.to, "late", 999)
+      .filter((r) => r.late_days > threshold)
+      .slice(0, 20)
+      .map((r) => [r.member_name, r.department ?? "—", r.late_days] as (string | number)[]);
+    if (!rows.length) return { intent: "late_count", title: L.titleLate(threshold, period.label), text: L.none };
+    return {
+      intent: "late_count",
+      title: L.titleLate(threshold, period.label),
+      columns: [L.colPerson, L.colDept, L.colLate],
+      rows,
+    };
+  }
+
+  // 4. overtime_by_department — "Quels départements ont le plus d'heures sup ?"
+  if (/heures? sup|overtime|supplementaire|اضاف|إضاف/.test(n)) {
+    const WORKDAY_SECONDS = 8 * 3600; // mock site workday (no workday length in settings)
+    const rows = mockReportsDepartments(period.from, period.to)
+      .map((d) => {
+        const attended = d.present_days + d.late_days;
+        const overtime = Math.max(0, d.avg_worked_seconds - WORKDAY_SECONDS) * attended;
+        return { dept: d.department, overtime, members: d.members };
+      })
+      .filter((r) => r.overtime > 0)
+      .sort((a, b) => b.overtime - a.overtime)
+      .map((r) => [r.dept, formatDuration(Math.round(r.overtime)), r.members] as (string | number)[]);
+    if (!rows.length) return { intent: "overtime_by_department", title: L.titleOvertime(period.label), text: L.none };
+    return {
+      intent: "overtime_by_department",
+      title: L.titleOvertime(period.label),
+      columns: [L.colDept, L.colOvertime, L.colMembers],
+      rows,
+    };
+  }
+
+  // 5. earliest_arrivals
+  if (/plus tot|premiere|premier|earliest|arrived first|matinal|ابكر|الابكر/.test(n)) {
+    const rows = MOCK_ATTENDANCE.filter((a) => a.first_in_ts)
+      .sort((a, b) => +new Date(a.first_in_ts as string) - +new Date(b.first_in_ts as string))
+      .slice(0, 10)
+      .map((a) => [a.member_name, a.department ?? "—", formatTime(a.first_in_ts, locale)] as (string | number)[]);
+    if (!rows.length) return { intent: "earliest_arrivals", title: L.titleEarliest, text: L.none };
+    return { intent: "earliest_arrivals", title: L.titleEarliest, columns: [L.colPerson, L.colDept, L.colTime], rows };
+  }
+
+  // 6. absent_today
+  if (/absent|غائب|غياب/.test(n)) {
+    const activeIds = new Set(liveMembers.filter((m) => m.status === "active").map((m) => m.id));
+    const rows = MOCK_ATTENDANCE.filter((a) => a.status === "absent" && activeIds.has(a.member_id))
+      .map((a) => [a.member_name, a.department ?? "—"] as (string | number)[]);
+    if (!rows.length) return { intent: "absent_today", title: L.titleAbsent, text: L.none };
+    return { intent: "absent_today", title: L.titleAbsent, columns: [L.colPerson, L.colDept], rows };
+  }
+
+  // 7. on_site_now
+  if (/sur site|on site|present|combien|qui est la|في الموقع|الان|الآن|who is here/.test(n)) {
+    const ppl = mockPresenceNow().people;
+    const rows = ppl.map(
+      (p) => [p.member_name, p.zone_name ?? "—", formatTime(p.first_in_ts, locale)] as (string | number)[],
+    );
+    if (!rows.length) return { intent: "on_site_now", title: L.titleOnsite(0), text: L.none };
+    return { intent: "on_site_now", title: L.titleOnsite(ppl.length), columns: [L.colPerson, L.colZone, L.colTime], rows };
+  }
+
+  return { intent: "unknown", title: L.unknownTitle, text: L.unknownHint, suggestions };
 }

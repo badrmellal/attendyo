@@ -14,11 +14,15 @@ import { useBranding } from "@/components/BrandingProvider";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { login, setToken, isMockForced } from "@/lib/api";
 
+/** Demo credentials seeded for mock mode (CONTRACT default operator). */
+const DEMO_EMAIL = "admin@attendyo.local";
+const DEMO_PASSWORD = "attendyo-admin";
+
 export default function LoginPage() {
   const router = useRouter();
   const { branding, t } = useBranding();
-  const [email, setEmail] = useState(isMockForced() ? "admin@attendyo.local" : "");
-  const [password, setPassword] = useState(isMockForced() ? "attendyo-admin" : "");
+  const [email, setEmail] = useState(isMockForced() ? DEMO_EMAIL : "");
+  const [password, setPassword] = useState(isMockForced() ? DEMO_PASSWORD : "");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -31,10 +35,16 @@ export default function LoginPage() {
       setToken(res.access_token);
       router.push("/dashboard");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Sign-in failed.");
+      setError(err instanceof Error ? err.message : t("login.failed"));
       setLoading(false);
     }
   }
+
+  // Localized demo hint with the two credentials emphasized in the right spot
+  // for any locale: interpolate placeholder tokens, then split around them.
+  const demoParts = t("login.demoHint", { email: "%%E%%", password: "%%P%%" }).split(
+    /%%E%%|%%P%%/,
+  );
 
   return (
     <div className="app-aura min-h-screen lg:grid lg:grid-cols-2">
@@ -71,11 +81,7 @@ export default function LoginPage() {
             {branding.tagline}
           </h2>
           <ul className="mt-8 space-y-4">
-            {[
-              "Une seule photo enregistre une personne.",
-              "La porte s'ouvre quand elle la reconnaît.",
-              "Chaque entrée et sortie est enregistrée pour la journée.",
-            ].map((line) => (
+            {[t("login.point1"), t("login.point2"), t("login.point3")].map((line) => (
               <li key={line} className="flex items-start gap-3 text-text/85">
                 <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/25 text-primary ring-1 ring-primary/30">
                   <ShieldCheck className="h-3 w-3" />
@@ -86,14 +92,12 @@ export default function LoginPage() {
           </ul>
         </div>
 
-        <p className="relative z-10 text-xs text-text-muted">
-          Sur site · sans cloud · sans abonnement · sans badge à perdre.
-        </p>
+        <p className="relative z-10 text-xs text-text-muted">{t("login.footer")}</p>
       </aside>
 
       {/* Form panel */}
       <main className="relative flex min-h-screen items-center justify-center p-6">
-        <div className="absolute right-5 top-5">
+        <div className="absolute end-5 top-5">
           <ThemeToggle />
         </div>
 
@@ -116,15 +120,15 @@ export default function LoginPage() {
                 {t("login.email")}
               </span>
               <div className="relative">
-                <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
+                <Mail className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
                 <input
                   type="email"
                   required
                   autoComplete="username"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="field w-full py-2.5 pl-10 pr-3 text-sm"
-                  placeholder="admin@attendyo.local"
+                  className="field w-full py-2.5 ps-10 pe-3 text-sm"
+                  placeholder={DEMO_EMAIL}
                 />
               </div>
             </label>
@@ -134,14 +138,14 @@ export default function LoginPage() {
                 {t("login.password")}
               </span>
               <div className="relative">
-                <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
+                <Lock className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
                 <input
                   type="password"
                   required
                   autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="field w-full py-2.5 pl-10 pr-3 text-sm"
+                  className="field w-full py-2.5 ps-10 pe-3 text-sm"
                   placeholder="••••••••••"
                 />
               </div>
@@ -172,9 +176,11 @@ export default function LoginPage() {
 
           {isMockForced() && (
             <p className="mt-6 rounded-lg border border-accent/20 bg-accent/[0.06] px-3 py-2.5 text-center text-xs text-text-muted">
-              Mode démo — connectez-vous avec{" "}
-              <span className="font-medium text-text">admin@attendyo.local</span> /{" "}
-              <span className="font-medium text-text">attendyo-admin</span>
+              {demoParts[0]}
+              <span className="font-medium text-text">{DEMO_EMAIL}</span>
+              {demoParts[1]}
+              <span className="font-medium text-text">{DEMO_PASSWORD}</span>
+              {demoParts[2]}
             </p>
           )}
         </div>

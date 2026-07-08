@@ -33,10 +33,11 @@ import { listAudit, listUsers, me, deleteUser } from "@/lib/api";
 import type { AuditEntry, AuthUser, OperatorRole, OperatorUser } from "@/lib/types";
 import { cn, formatDate, formatDateTime } from "@/lib/utils";
 
-const ROLE_META: Record<OperatorRole, { label: string; tone: "ok" | "info" | "muted" }> = {
-  admin: { label: "Administrateur", tone: "ok" },
-  operator: { label: "Opérateur", tone: "info" },
-  viewer: { label: "Lecteur", tone: "muted" },
+// Role labels come from the i18n layer (team.role.*); only tone is kept here.
+const ROLE_TONE: Record<OperatorRole, "ok" | "info" | "muted"> = {
+  admin: "ok",
+  operator: "info",
+  viewer: "muted",
 };
 
 /** Known audit actions, straight from CONTRACT.md (the filter's option list). */
@@ -66,7 +67,8 @@ const AUDIT_ACTIONS = [
 type Tab = "operators" | "audit";
 
 export default function TeamPage() {
-  const { branding } = useBranding();
+  const { branding, t } = useBranding();
+  const roleLabel = (role: OperatorRole) => t(`team.role.${role}`);
   const [self, setSelf] = useState<AuthUser | null>(null);
   const [selfLoading, setSelfLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("operators");
@@ -165,8 +167,8 @@ export default function TeamPage() {
       <div className="card">
         <EmptyState
           icon={Lock}
-          title="Réservé aux administrateurs"
-          description="La gestion de l'équipe et le journal d'audit nécessitent le rôle administrateur."
+          title={t("team.notAdmin.title")}
+          description={t("team.notAdmin.desc")}
         />
       </div>
     );
@@ -176,7 +178,7 @@ export default function TeamPage() {
   const userColumns: Column<OperatorUser>[] = [
     {
       key: "user",
-      header: "Opérateur",
+      header: t("team.col.operator"),
       cell: (u) => (
         <div className="flex items-center gap-3">
           <Avatar name={u.full_name || u.email} size={32} />
@@ -184,7 +186,7 @@ export default function TeamPage() {
             <p className="truncate font-medium text-text">
               {u.full_name || u.email}
               {u.email === self?.email && (
-                <span className="ml-2 text-xs font-normal text-text-muted">(vous)</span>
+                <span className="ms-2 text-xs font-normal text-text-muted">{t("team.you")}</span>
               )}
             </p>
             <p className="truncate text-xs text-text-muted">{u.email}</p>
@@ -194,12 +196,12 @@ export default function TeamPage() {
     },
     {
       key: "role",
-      header: "Rôle",
-      cell: (u) => <Pill tone={ROLE_META[u.role].tone}>{ROLE_META[u.role].label}</Pill>,
+      header: t("team.col.role"),
+      cell: (u) => <Pill tone={ROLE_TONE[u.role]}>{roleLabel(u.role)}</Pill>,
     },
     {
       key: "created",
-      header: "Créé le",
+      header: t("team.col.createdAt"),
       align: "right",
       cell: (u) => (
         <span className="tnum text-sm text-text-muted">
@@ -217,16 +219,16 @@ export default function TeamPage() {
         const lastAdmin = u.role === "admin" && adminCount <= 1;
         const actions: RowAction[] = [
           {
-            label: "Modifier",
+            label: t("common.edit"),
             icon: Pencil,
             onSelect: () => setUserDialog({ open: true, user: u }),
           },
           {
             label: isSelf
-              ? "Supprimer (votre compte)"
+              ? t("team.delete.self")
               : lastAdmin
-                ? "Supprimer (dernier admin)"
-                : "Supprimer",
+                ? t("team.delete.lastAdmin")
+                : t("common.delete"),
             icon: Trash2,
             tone: "danger",
             // The UI refuses self-delete and last-admin outright; the API
@@ -237,7 +239,7 @@ export default function TeamPage() {
         ];
         return (
           <div className="flex justify-end">
-            <RowMenu actions={actions} label={`Actions pour ${u.email}`} />
+            <RowMenu actions={actions} label={t("people.rowActions", { name: u.email })} />
           </div>
         );
       },
@@ -260,7 +262,7 @@ export default function TeamPage() {
     },
     {
       key: "ts",
-      header: "Horodatage",
+      header: t("team.audit.col.ts"),
       cell: (e) => (
         <span className="tnum whitespace-nowrap text-sm text-text-muted">
           {formatDateTime(e.ts, branding.locale)}
@@ -269,12 +271,12 @@ export default function TeamPage() {
     },
     {
       key: "user",
-      header: "Utilisateur",
+      header: t("team.audit.col.user"),
       cell: (e) => <span className="text-sm text-text">{e.user_email || "—"}</span>,
     },
     {
       key: "action",
-      header: "Action",
+      header: t("team.audit.col.action"),
       cell: (e) => (
         <code className="rounded-md bg-surface-2/60 px-2 py-0.5 text-xs text-primary">
           {e.action}
@@ -283,7 +285,7 @@ export default function TeamPage() {
     },
     {
       key: "entity",
-      header: "Entité",
+      header: t("team.audit.col.entity"),
       cell: (e) => (
         <span className="text-sm text-text-muted">
           {e.entity || "—"}
@@ -295,7 +297,7 @@ export default function TeamPage() {
     },
     {
       key: "details",
-      header: "Détails",
+      header: t("team.audit.col.details"),
       cell: (e) => {
         const keys = Object.keys(e.details);
         if (keys.length === 0) return <span className="text-xs text-text-muted">—</span>;
@@ -305,7 +307,7 @@ export default function TeamPage() {
           </pre>
         ) : (
           <span className="text-xs text-text-muted">
-            {keys.length} champ(s) — cliquer pour détailler
+            {t("team.audit.fields", { n: keys.length })}
           </span>
         );
       },
@@ -318,11 +320,9 @@ export default function TeamPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="font-display text-xl font-semibold tracking-tight text-text">
-            Équipe & audit
+            {t("team.title")}
           </h2>
-          <p className="text-sm text-text-muted">
-            Comptes de la Console et journal des actions (conformité).
-          </p>
+          <p className="text-sm text-text-muted">{t("team.subtitle")}</p>
         </div>
         {tab === "operators" ? (
           <button
@@ -331,16 +331,16 @@ export default function TeamPage() {
             className="btn-primary inline-flex items-center justify-center gap-2 px-4 py-2 text-sm"
           >
             <UserPlus className="h-4 w-4" />
-            Nouvel opérateur
+            {t("team.newOperator")}
           </button>
         ) : (
           <select
             value={actionFilter}
             onChange={(e) => setActionFilter(e.target.value)}
             className="field px-3 py-2 text-sm"
-            aria-label="Filtrer par action"
+            aria-label={t("team.filterActions.aria")}
           >
-            <option value="">Toutes les actions</option>
+            <option value="">{t("team.allActions")}</option>
             {AUDIT_ACTIONS.map((a) => (
               <option key={a} value={a}>
                 {a}
@@ -359,7 +359,7 @@ export default function TeamPage() {
             tab === "operators" ? "bg-surface text-text shadow-sm" : "text-text-muted",
           )}
         >
-          <UsersRound className="h-4 w-4" /> Opérateurs
+          <UsersRound className="h-4 w-4" /> {t("team.tab.operators")}
         </button>
         <button
           type="button"
@@ -369,7 +369,7 @@ export default function TeamPage() {
             tab === "audit" ? "bg-surface text-text shadow-sm" : "text-text-muted",
           )}
         >
-          <ScrollText className="h-4 w-4" /> Journal d&apos;audit
+          <ScrollText className="h-4 w-4" /> {t("team.tab.audit")}
         </button>
       </div>
 
@@ -383,15 +383,15 @@ export default function TeamPage() {
           empty={
             <EmptyState
               icon={UsersRound}
-              title="Aucun opérateur"
-              description="Ajoutez les comptes de votre équipe sécurité et RH."
+              title={t("team.empty.operators.title")}
+              description={t("team.empty.operators.desc")}
               action={
                 <button
                   type="button"
                   onClick={() => setUserDialog({ open: true, user: null })}
                   className="btn-primary inline-flex items-center gap-2 px-4 py-2 text-sm"
                 >
-                  <Plus className="h-4 w-4" /> Nouvel opérateur
+                  <Plus className="h-4 w-4" /> {t("team.newOperator")}
                 </button>
               }
             />
@@ -410,12 +410,8 @@ export default function TeamPage() {
           empty={
             <EmptyState
               icon={ScrollText}
-              title="Journal vide"
-              description={
-                actionFilter
-                  ? "Aucune entrée pour cette action — élargissez le filtre."
-                  : "Chaque action d'opérateur sera consignée ici, en lecture seule."
-              }
+              title={t("team.audit.empty.title")}
+              description={actionFilter ? t("team.audit.empty.filtered") : t("team.audit.empty.desc")}
             />
           }
         />
@@ -432,15 +428,9 @@ export default function TeamPage() {
         open={deleting !== null}
         onClose={() => setDeleting(null)}
         onConfirm={confirmDelete}
-        title="Supprimer l'opérateur"
-        confirmLabel="Supprimer"
-        description={
-          <p>
-            Supprimer le compte{" "}
-            <span className="font-medium text-text">{deleting?.email}</span> ? La personne ne
-            pourra plus se connecter à la Console. Cette action est tracée dans l&apos;audit.
-          </p>
-        }
+        title={t("team.delete.title")}
+        confirmLabel={t("common.delete")}
+        description={<p>{t("team.delete.desc", { email: deleting?.email ?? "" })}</p>}
       />
     </div>
   );

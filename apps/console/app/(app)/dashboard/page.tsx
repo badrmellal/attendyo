@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { StatCard } from "@/components/StatCard";
 import { HourlyChart } from "@/components/HourlyChart";
+import { AskBar } from "@/components/AskBar";
 import { InsightsPanel } from "@/components/InsightsPanel";
 import { LiveFeed } from "@/components/LiveFeed";
 import { DataTable, type Column } from "@/components/DataTable";
@@ -42,18 +43,19 @@ import {
   streamEvents,
 } from "@/lib/api";
 import type { AccessEvent, TodayStats } from "@/lib/types";
-import { formatTime, formatSimilarity } from "@/lib/utils";
+import { formatTime, formatSimilarity, formatNumber } from "@/lib/utils";
 
 function DirectionBadge({ direction }: { direction: AccessEvent["direction"] }) {
+  const { directionLabel } = useBranding();
   const map = {
-    in: { Icon: ArrowDownLeft, cls: "text-primary", label: "Entrée" },
-    out: { Icon: ArrowUpRight, cls: "text-info", label: "Sortie" },
-    unknown: { Icon: Minus, cls: "text-text-muted", label: "—" },
+    in: { Icon: ArrowDownLeft, cls: "text-primary" },
+    out: { Icon: ArrowUpRight, cls: "text-info" },
+    unknown: { Icon: Minus, cls: "text-text-muted" },
   } as const;
-  const { Icon, cls, label } = map[direction];
+  const { Icon, cls } = map[direction];
   return (
     <span className={`inline-flex items-center gap-1 text-xs font-medium ${cls}`}>
-      <Icon className="h-3.5 w-3.5" /> {label}
+      <Icon className="h-3.5 w-3.5" /> {directionLabel(direction)}
     </span>
   );
 }
@@ -100,10 +102,10 @@ export default function DashboardPage() {
   const columns: Column<AccessEvent>[] = [
     {
       key: "member",
-      header: "Personne",
+      header: t("dash.col.person"),
       cell: (e) => (
         <div className="flex items-center gap-3">
-          <Avatar name={e.member_name || "Inconnu"} size={32} />
+          <Avatar name={e.member_name || t("feed.unknown")} size={32} />
           <div className="min-w-0">
             <p className="truncate font-medium text-text">{e.member_name || "—"}</p>
             <p className="truncate text-xs text-text-muted">{e.door_name}</p>
@@ -113,12 +115,12 @@ export default function DashboardPage() {
     },
     {
       key: "direction",
-      header: "Sens",
+      header: t("dash.col.direction"),
       cell: (e) => <DirectionBadge direction={e.direction} />,
     },
     {
       key: "similarity",
-      header: "Score",
+      header: t("dash.col.score"),
       align: "right",
       cell: (e) => (
         <span className="tnum text-sm text-text-muted">{formatSimilarity(e.similarity)}</span>
@@ -126,7 +128,7 @@ export default function DashboardPage() {
     },
     {
       key: "time",
-      header: "Heure",
+      header: t("dash.col.time"),
       align: "right",
       cell: (e) => (
         <span className="tnum text-sm text-text-muted">{formatTime(e.ts, branding.locale)}</span>
@@ -134,7 +136,7 @@ export default function DashboardPage() {
     },
     {
       key: "decision",
-      header: "Décision",
+      header: t("dash.col.decision"),
       align: "right",
       cell: (e) => (
         <div className="flex justify-end">
@@ -160,7 +162,9 @@ export default function DashboardPage() {
         </div>
         {stats && (
           <p className="text-sm text-text-muted">
-            <span className="tnum font-semibold text-text">{stats.total_members}</span>{" "}
+            <span className="tnum font-semibold text-text">
+              {formatNumber(stats.total_members, branding.locale)}
+            </span>{" "}
             {term.activeCountLabel}
           </p>
         )}
@@ -174,7 +178,7 @@ export default function DashboardPage() {
           icon={UserCheck}
           tone="primary"
           loading={loading}
-          sub="Pointés ce matin"
+          sub={t("dash.sub.present")}
         />
         <StatCard
           label={t("stat.late")}
@@ -182,7 +186,7 @@ export default function DashboardPage() {
           icon={Clock}
           tone="accent"
           loading={loading}
-          sub="Après l'heure de grâce"
+          sub={t("dash.sub.late")}
         />
         <StatCard
           label={t("stat.absent")}
@@ -190,26 +194,26 @@ export default function DashboardPage() {
           icon={UserX}
           tone="danger"
           loading={loading}
-          sub="Aucun pointage"
+          sub={t("dash.sub.absent")}
         />
-        <Link href="/presence" className="block" aria-label="Voir qui est sur site">
+        <Link href="/presence" className="block" aria-label={t("dash.onsite.aria")}>
           <StatCard
             label={t("stat.onsite")}
             value={stats?.on_site_now ?? 0}
             icon={Building2}
             tone="info"
             loading={loading}
-            sub="Voir la liste sur site →"
+            sub={t("dash.sub.onsite")}
           />
         </Link>
-        <Link href="/alerts" className="block" aria-label="Voir les alertes non acquittées">
+        <Link href="/alerts" className="block" aria-label={t("dash.alerts.aria")}>
           <StatCard
-            label="Alertes"
+            label={t("stat.alerts")}
             value={unackAlerts}
             icon={BellRing}
             tone={unackAlerts > 0 ? "danger" : "muted"}
             loading={loading}
-            sub={unackAlerts > 0 ? "Non acquittées — voir →" : "Rien à acquitter"}
+            sub={unackAlerts > 0 ? t("dash.sub.alertsSome") : t("dash.sub.alertsNone")}
           />
         </Link>
         <StatCard
@@ -218,7 +222,7 @@ export default function DashboardPage() {
           icon={ShieldAlert}
           tone="muted"
           loading={loading}
-          sub="Accès refusés"
+          sub={t("dash.sub.denied")}
         />
       </div>
 
@@ -227,8 +231,8 @@ export default function DashboardPage() {
         <div className="card p-5 lg:col-span-2">
           <div className="mb-4 flex items-center justify-between">
             <div>
-              <h3 className="font-display font-semibold text-text">Entrées par heure</h3>
-              <p className="text-xs text-text-muted">Flux d'arrivées sur la journée</p>
+              <h3 className="font-display font-semibold text-text">{t("dash.hourly.title")}</h3>
+              <p className="text-xs text-text-muted">{t("dash.hourly.sub")}</p>
             </div>
             <Activity className="h-4 w-4 text-text-muted" />
           </div>
@@ -242,15 +246,15 @@ export default function DashboardPage() {
         <div className="card flex flex-col p-5">
           <div className="mb-4 flex items-center justify-between">
             <div>
-              <h3 className="font-display font-semibold text-text">Flux en direct</h3>
-              <p className="text-xs text-text-muted">Décisions d'accès en temps réel</p>
+              <h3 className="font-display font-semibold text-text">{t("dash.live.title")}</h3>
+              <p className="text-xs text-text-muted">{t("dash.live.sub")}</p>
             </div>
             <span className="flex items-center gap-1.5 text-xs font-medium text-primary">
               <span className="relative flex h-2 w-2">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary/50" />
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
               </span>
-              Live
+              {t("common.live")}
             </span>
           </div>
           <div className="-mr-2 max-h-[280px] flex-1 overflow-y-auto pr-2">
@@ -259,15 +263,18 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* Ask — natural questions, answered locally (deterministic, on-prem) */}
+      <AskBar />
+
       {/* "{product} IQ" — local behavioural insights, below the live feed */}
       <InsightsPanel />
 
       {/* Latest entries */}
       <div>
         <div className="mb-3 flex items-center justify-between">
-          <h3 className="font-display font-semibold text-text">Dernières entrées</h3>
+          <h3 className="font-display font-semibold text-text">{t("dash.latest.title")}</h3>
           <Link href="/monitor" className="text-sm font-medium text-primary hover:underline">
-            Voir la surveillance →
+            {t("dash.latest.link")}
           </Link>
         </div>
         <DataTable
@@ -279,8 +286,8 @@ export default function DashboardPage() {
           empty={
             <EmptyState
               icon={Inbox}
-              title="Aucune entrée pour l'instant"
-              description="Les accès autorisés apparaîtront ici dès la première reconnaissance."
+              title={t("dash.empty.title")}
+              description={t("dash.empty.desc")}
             />
           }
         />

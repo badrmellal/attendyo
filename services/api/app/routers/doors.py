@@ -28,7 +28,7 @@ router = APIRouter(prefix="/api/doors", tags=["doors"])
 
 _DOOR_COLUMNS = (
     "id, site_id, name, location, direction, driver, driver_config, "
-    "relock_seconds, enabled, created_at"
+    "relock_seconds, enabled, zone_id, created_at"
 )
 
 
@@ -49,6 +49,7 @@ def _to_door(row: dict[str, Any]) -> Door:
         driver_config=cfg or {},
         relock_seconds=row["relock_seconds"],
         enabled=row["enabled"],
+        zone_id=str(row["zone_id"]) if row.get("zone_id") else None,
         created_at=row["created_at"],
     )
 
@@ -71,14 +72,14 @@ async def create_door(
         f"""
         INSERT INTO doors
             (site_id, name, location, direction, driver, driver_config,
-             relock_seconds, enabled)
-        VALUES (%s,%s,%s,%s,%s,%s::jsonb,%s,%s)
+             relock_seconds, enabled, zone_id)
+        VALUES (%s,%s,%s,%s,%s,%s::jsonb,%s,%s,%s)
         RETURNING {_DOOR_COLUMNS}
         """,
         (
             payload.site_id, payload.name, payload.location, payload.direction,
             payload.driver, json.dumps(payload.driver_config), payload.relock_seconds,
-            payload.enabled,
+            payload.enabled, payload.zone_id,
         ),
     )
     assert row is not None

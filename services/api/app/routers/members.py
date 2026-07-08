@@ -46,9 +46,12 @@ from ..models.schemas import (
     ImportResult,
     Member,
     MemberStatus,
+    MemberTimeline,
     MemberType,
     MemberUpdate,
+    TimelineStep,
 )
+from ..services import zones as zones_service
 
 logger = logging.getLogger("attendyo.members")
 
@@ -450,6 +453,70 @@ async def get_member_photo(
     if not path.exists():
         raise HTTPException(status_code=404, detail="Photo not found")
     return FileResponse(path)
+
+
+# --------------------------------------------------------------------------- #
+# Movement — door-crossing timeline (v3)
+# --------------------------------------------------------------------------- #
+@router.get("/{member_id}/timeline", response_model=MemberTimeline)
+async def member_timeline(
+    member_id: str = Path(...),
+    date: Optional[str] = Query(None, description="YYYY-MM-DD; defaults to today"),
+    all: int = Query(0, description="1 = include denials, not just granted"),
+    _user: dict = Depends(security.get_current_user),
+) -> MemberTimeline:
+    """A member's door crossings for a day (ascending), each tagged with its zone.
+
+    Movement in v3 is the sequence of door crossings — honest zone-level
+    tracking, not continuous camera-to-camera re-identification. Granted only by
+    default; ``all=1`` includes denied attempts. Cheap indexed query.
+    """
+    member_row = await run_in_threadpool(
+        db.query_one, f"SELECT {_MEMBER_COLUMNS} FROM members WHERE id = %s", (member_id,)
+    )
+    if member_row is None:
+        raise HTTPException(status_code=404, detail="Member not found")
+
+    if date:
+        try:
+            work_date = dt.date.fromisoformat(date)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail="Invalid 'date' (YYYY-MM-DD)") from exc
+    else:
+        work_date = await run_in_threadpool(zones_service.site_local_today)
+
+    granted_only = int(all) != 1
+
+    def _load_steps() -> list[dict[str, Any]]:
+        clause = "AND e.decision = 'granted'" if granted_only else ""
+        return db.query_all(
+            f"""
+            SELECT e.ts, d.name AS door_name, z.name AS zone_name,
+                   e.direction, e.decision
+            FROM access_events e
+            LEFT JOIN doors d ON d.id = e.door_id
+            LEFT JOIN zones z ON z.id = d.zone_id
+            WHERE e.member_id = %s
+              AND e.ts >= %s::date
+              AND e.ts < (%s::date + interval '1 day')
+              {clause}
+            ORDER BY e.ts ASC
+            """,
+            (member_id, work_date, work_date),
+        )
+
+    rows = await run_in_threadpool(_load_steps)
+    steps = [
+        TimelineStep(
+            ts=r["ts"],
+            door_name=r.get("door_name"),
+            zone_name=r.get("zone_name"),
+            direction=(r.get("direction") or "unknown"),
+            decision=r["decision"],
+        )
+        for r in rows
+    ]
+    return MemberTimeline(member=_to_member(member_row), date=work_date, steps=steps)
 
 
 # --------------------------------------------------------------------------- #

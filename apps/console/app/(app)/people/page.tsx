@@ -19,12 +19,14 @@ import {
   Pencil,
   PauseCircle,
   PlayCircle,
+  Route,
   Trash2,
 } from "lucide-react";
 import { DataTable, type Column } from "@/components/DataTable";
 import { EnrollDialog } from "@/components/EnrollDialog";
 import { KioskMessageDialog } from "@/components/KioskMessageDialog";
 import { MemberDialog } from "@/components/MemberDialog";
+import { MovementTimelineDialog } from "@/components/MovementTimelineDialog";
 import { ImportMembersDialog } from "@/components/ImportMembersDialog";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { RowMenu, type RowAction } from "@/components/RowMenu";
@@ -42,18 +44,12 @@ import {
 } from "@/lib/api";
 import { memberTypeOptions } from "@/lib/terminology";
 import type { AccessGroup, Member, MemberStatus, MemberType } from "@/lib/types";
-import { cn, formatDate, humanize } from "@/lib/utils";
+import { cn, formatDate, formatNumber, humanize } from "@/lib/utils";
 
 const STATUS_TONE: Record<MemberStatus, "ok" | "warn" | "muted"> = {
   active: "ok",
   suspended: "warn",
   archived: "muted",
-};
-
-const STATUS_LABEL: Record<MemberStatus, string> = {
-  active: "Actif",
-  suspended: "Suspendu",
-  archived: "Archivé",
 };
 
 /** Validity window already over? (valid_until is an inclusive ISO date) */
@@ -62,7 +58,7 @@ function isExpired(m: Member): boolean {
 }
 
 export default function PeoplePage() {
-  const { term, branding } = useBranding();
+  const { term, branding, t, memberStatusLabel } = useBranding();
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
@@ -74,6 +70,7 @@ export default function PeoplePage() {
   const [accessGroups, setAccessGroups] = useState<AccessGroup[]>([]);
   const [editing, setEditing] = useState<Member | null>(null);
   const [messaging, setMessaging] = useState<Member | null>(null);
+  const [timelineFor, setTimelineFor] = useState<Member | null>(null);
   const [deleting, setDeleting] = useState<Member | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -135,7 +132,7 @@ export default function PeoplePage() {
   const columns: Column<Member>[] = [
     {
       key: "name",
-      header: "Nom",
+      header: t("people.col.name"),
       cell: (m) => (
         <div className="flex items-center gap-3">
           <Avatar name={m.full_name} src={memberPhotoSrc(m.photo_url)} size={36} />
@@ -145,8 +142,8 @@ export default function PeoplePage() {
               {m.kiosk_message && (
                 <span
                   className="shrink-0 text-accent"
-                  title={`Message d'accueil en attente : « ${m.kiosk_message} »`}
-                  aria-label="Message d'accueil en attente"
+                  title={t("people.msgPending", { msg: m.kiosk_message })}
+                  aria-label={t("people.msgPending.aria")}
                 >
                   <MessageSquareText className="h-3.5 w-3.5" />
                 </span>
@@ -167,14 +164,14 @@ export default function PeoplePage() {
     },
     {
       key: "type",
-      header: "Type",
+      header: t("people.col.type"),
       cell: (m) => (
         <span className="text-sm text-text-muted">{term.memberTypeLabels[m.member_type]}</span>
       ),
     },
     {
       key: "contact",
-      header: "Contact",
+      header: t("people.col.contact"),
       cell: (m) => (
         <div className="space-y-0.5">
           {m.email && (
@@ -193,16 +190,17 @@ export default function PeoplePage() {
     },
     {
       key: "status",
-      header: "Statut",
+      header: t("people.col.status"),
       align: "right",
       cell: (m) => (
         <div className="flex flex-wrap items-center justify-end gap-1.5">
           {isExpired(m) && (
             <Pill tone="warn" dot={false}>
-              Expiré {m.valid_until ? `· ${formatDate(m.valid_until, branding.locale)}` : ""}
+              {t("memberStatus.expired")}{" "}
+              {m.valid_until ? `· ${formatDate(m.valid_until, branding.locale)}` : ""}
             </Pill>
           )}
-          <Pill tone={STATUS_TONE[m.status]}>{STATUS_LABEL[m.status]}</Pill>
+          <Pill tone={STATUS_TONE[m.status]}>{memberStatusLabel(m.status)}</Pill>
         </div>
       ),
     },
@@ -214,20 +212,25 @@ export default function PeoplePage() {
       cell: (m) => {
         const suspendable = m.status === "active";
         const actions: RowAction[] = [
-          { label: "Modifier", icon: Pencil, onSelect: () => setEditing(m) },
+          { label: t("common.edit"), icon: Pencil, onSelect: () => setEditing(m) },
           {
-            label: "Message d'accueil",
+            label: t("timeline.action"),
+            icon: Route,
+            onSelect: () => setTimelineFor(m),
+          },
+          {
+            label: t("people.action.message"),
             icon: MessageSquareText,
             onSelect: () => setMessaging(m),
           },
           {
-            label: suspendable ? "Suspendre" : "Activer",
+            label: suspendable ? t("common.suspend") : t("common.activate"),
             icon: suspendable ? PauseCircle : PlayCircle,
             disabled: busyId === m.id,
             onSelect: () => toggleStatus(m),
           },
           {
-            label: "Supprimer",
+            label: t("common.delete"),
             icon: Trash2,
             tone: "danger",
             onSelect: () => setDeleting(m),
@@ -235,7 +238,7 @@ export default function PeoplePage() {
         ];
         return (
           <div className="flex justify-end">
-            <RowMenu actions={actions} label={`Actions pour ${m.full_name}`} />
+            <RowMenu actions={actions} label={t("people.rowActions", { name: m.full_name })} />
           </div>
         );
       },
@@ -252,9 +255,12 @@ export default function PeoplePage() {
           <h2 className="font-display text-xl font-semibold tracking-tight text-text">
             {term.peopleNav}
           </h2>
-          <p className="text-sm text-text-muted">
-            <span className="tnum font-medium text-text">{filtered.length}</span> sur{" "}
-            <span className="tnum">{members.length}</span> {term.personPlural}
+          <p className="text-sm text-text-muted tnum">
+            {t("people.count", {
+              filtered: formatNumber(filtered.length, branding.locale),
+              total: formatNumber(members.length, branding.locale),
+              noun: term.personPlural,
+            })}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -264,7 +270,7 @@ export default function PeoplePage() {
             className="btn-ghost inline-flex items-center justify-center gap-2 px-4 py-2 text-sm"
           >
             <FileUp className="h-4 w-4" />
-            Importer CSV
+            {t("common.import")}
           </button>
           <button
             type="button"
@@ -272,7 +278,7 @@ export default function PeoplePage() {
             className="btn-primary inline-flex items-center justify-center gap-2 px-4 py-2 text-sm"
           >
             <UserPlus className="h-4 w-4" />
-            Enregistrer une personne
+            {t("people.enroll")}
           </button>
         </div>
       </div>
@@ -280,35 +286,35 @@ export default function PeoplePage() {
       {/* Filters */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
+          <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Rechercher par nom, e-mail, identifiant…"
-            className="field w-full py-2 pl-10 pr-3 text-sm"
+            placeholder={t("people.searchPlaceholder")}
+            className="field w-full py-2 ps-10 pe-3 text-sm"
           />
         </div>
         <div className="flex items-center gap-2">
           <span className="hidden items-center gap-1.5 text-xs text-text-muted sm:flex">
             <Filter className="h-3.5 w-3.5" />
-            {activeFilters > 0 ? `${activeFilters} filtre(s)` : "Filtres"}
+            {activeFilters > 0 ? t("filter.count", { n: activeFilters }) : t("common.filters")}
           </span>
           <select
             value={status}
             onChange={(e) => setStatus(e.target.value as MemberStatus | "")}
             className="field px-3 py-2 text-sm"
           >
-            <option value="">Tous statuts</option>
-            <option value="active">Actif</option>
-            <option value="suspended">Suspendu</option>
-            <option value="archived">Archivé</option>
+            <option value="">{t("filter.allStatuses")}</option>
+            <option value="active">{memberStatusLabel("active")}</option>
+            <option value="suspended">{memberStatusLabel("suspended")}</option>
+            <option value="archived">{memberStatusLabel("archived")}</option>
           </select>
           <select
             value={type}
             onChange={(e) => setType(e.target.value as MemberType | "")}
             className="field px-3 py-2 text-sm"
           >
-            <option value="">Tous types</option>
+            <option value="">{t("filter.allTypes")}</option>
             {memberTypeOptions(term).map((o) => (
               <option key={o.value} value={o.value}>
                 {o.label}
@@ -339,11 +345,11 @@ export default function PeoplePage() {
         empty={
           <EmptyState
             icon={Users}
-            title={query || activeFilters ? "Aucun résultat" : "Aucune personne enregistrée"}
+            title={query || activeFilters ? t("common.noResults") : t("people.empty.none.title")}
             description={
               query || activeFilters
-                ? "Ajustez la recherche ou les filtres."
-                : "Enregistrez votre première personne — une seule photo suffit."
+                ? t("common.adjustFilters")
+                : t("people.empty.none.desc")
             }
             action={
               !query && !activeFilters ? (
@@ -352,7 +358,7 @@ export default function PeoplePage() {
                   onClick={() => setEnrollOpen(true)}
                   className="btn-primary inline-flex items-center gap-2 px-4 py-2 text-sm"
                 >
-                  <UserPlus className="h-4 w-4" /> Enregistrer une personne
+                  <UserPlus className="h-4 w-4" /> {t("people.enroll")}
                 </button>
               ) : undefined
             }
@@ -371,6 +377,12 @@ export default function PeoplePage() {
         open={importOpen}
         onClose={() => setImportOpen(false)}
         onImported={() => refresh()}
+      />
+
+      <MovementTimelineDialog
+        open={timelineFor !== null}
+        member={timelineFor}
+        onClose={() => setTimelineFor(null)}
       />
 
       <KioskMessageDialog
@@ -401,17 +413,9 @@ export default function PeoplePage() {
         open={deleting !== null}
         onClose={() => setDeleting(null)}
         onConfirm={confirmDelete}
-        title="Supprimer la personne"
-        confirmLabel="Supprimer"
-        description={
-          <>
-            <p>
-              Supprimer <span className="font-medium text-text">{deleting?.full_name}</span> ?
-              Cette action retire aussi l&apos;empreinte faciale du moteur de vision et est
-              irréversible.
-            </p>
-          </>
-        }
+        title={t("people.delete.title")}
+        confirmLabel={t("common.delete")}
+        description={<p>{t("people.delete.desc", { name: deleting?.full_name ?? "" })}</p>}
       />
     </div>
   );

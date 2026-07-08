@@ -42,11 +42,11 @@ import { cn, formatDate, formatDuration, shiftDate, todayISO } from "@/lib/utils
 
 type Preset = "7d" | "30d" | "prev_month" | "custom";
 
-const PRESETS: { value: Preset; label: string }[] = [
-  { value: "7d", label: "7 jours" },
-  { value: "30d", label: "30 jours" },
-  { value: "prev_month", label: "Mois précédent" },
-  { value: "custom", label: "Personnalisé" },
+const PRESETS: { value: Preset; labelKey: string }[] = [
+  { value: "7d", labelKey: "reports.preset.7d" },
+  { value: "30d", labelKey: "reports.preset.30d" },
+  { value: "prev_month", labelKey: "reports.preset.prevMonth" },
+  { value: "custom", labelKey: "common.custom" },
 ];
 
 /** Local YYYY-MM-DD for an arbitrary Date. */
@@ -69,14 +69,14 @@ function rangeForPreset(preset: Preset): { from: string; to: string } {
   return prevMonthRange();
 }
 
-const SORTS: { value: ReportSort; label: string }[] = [
-  { value: "late", label: "Retards" },
-  { value: "absences", label: "Absences" },
-  { value: "hours", label: "Heures" },
+const SORTS: { value: ReportSort; labelKey: string }[] = [
+  { value: "late", labelKey: "reports.sort.late" },
+  { value: "absences", labelKey: "reports.sort.absences" },
+  { value: "hours", labelKey: "reports.sort.hours" },
 ];
 
 export default function ReportsPage() {
-  const { branding, term } = useBranding();
+  const { branding, term, t } = useBranding();
   const [preset, setPreset] = useState<Preset>("7d");
   const [custom, setCustom] = useState<{ from: string; to: string }>(() => ({
     from: shiftDate(todayISO(), -6),
@@ -159,31 +159,31 @@ export default function ReportsPage() {
     },
     {
       key: "members",
-      header: "Effectif",
+      header: t("reports.col.headcount"),
       align: "right",
       cell: (r) => <span className="tnum text-sm text-text">{r.members}</span>,
     },
     {
       key: "present",
-      header: "Jours présents",
+      header: t("reports.col.presentDays"),
       align: "right",
       cell: (r) => <span className="tnum text-sm text-primary">{r.present_days}</span>,
     },
     {
       key: "late",
-      header: "Retards",
+      header: t("reports.col.late"),
       align: "right",
       cell: (r) => <span className="tnum text-sm text-accent">{r.late_days}</span>,
     },
     {
       key: "absent",
-      header: "Absences",
+      header: t("reports.col.absences"),
       align: "right",
       cell: (r) => <span className="tnum text-sm text-danger">{r.absent_days}</span>,
     },
     {
       key: "hours",
-      header: "Heures moy./jour",
+      header: t("reports.col.avgHoursPerDay"),
       align: "right",
       cell: (r) => (
         <span className="tnum text-sm text-text">{formatDuration(r.avg_worked_seconds)}</span>
@@ -194,7 +194,7 @@ export default function ReportsPage() {
   const memberColumns: Column<MemberReport>[] = [
     {
       key: "member",
-      header: "Personne",
+      header: t("dash.col.person"),
       cell: (r) => (
         <div className="flex items-center gap-3">
           <Avatar name={r.member_name} size={32} />
@@ -207,13 +207,13 @@ export default function ReportsPage() {
     },
     {
       key: "present",
-      header: "Présents",
+      header: t("stat.present"),
       align: "right",
       cell: (r) => <span className="tnum text-sm text-primary">{r.present_days}</span>,
     },
     {
       key: "late",
-      header: "Retards",
+      header: t("reports.col.late"),
       align: "right",
       cell: (r) => (
         <span className={cn("tnum text-sm", sort === "late" ? "font-semibold text-accent" : "text-accent")}>
@@ -223,7 +223,7 @@ export default function ReportsPage() {
     },
     {
       key: "absent",
-      header: "Absences",
+      header: t("reports.col.absences"),
       align: "right",
       cell: (r) => (
         <span
@@ -238,13 +238,13 @@ export default function ReportsPage() {
     },
     {
       key: "arrival",
-      header: "Arrivée moy.",
+      header: t("reports.col.avgArrival"),
       align: "right",
       cell: (r) => <span className="tnum text-sm text-text-muted">{r.avg_arrival ?? "—"}</span>,
     },
     {
       key: "hours",
-      header: "Heures totales",
+      header: t("reports.col.totalHours"),
       align: "right",
       cell: (r) => (
         <span
@@ -264,26 +264,29 @@ export default function ReportsPage() {
       {/* Print-only report header */}
       <div className="hidden print:block">
         <h1 className="font-display text-2xl font-semibold text-text">
-          {branding.product_name} — Rapport de présence
+          {t("reports.print.title", { product: branding.product_name })}
         </h1>
         <p className="mt-1 text-sm text-text-muted">
-          Période : {formatDate(from, branding.locale)} → {formatDate(to, branding.locale)} ·
-          généré le {formatDate(todayISO(), branding.locale)}
+          {t("reports.print.header", {
+            from: formatDate(from, branding.locale),
+            to: formatDate(to, branding.locale),
+            today: formatDate(todayISO(), branding.locale),
+          })}
         </p>
       </div>
 
       {/* Toolbar */}
       <div className="flex flex-col gap-3 print:hidden sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="font-display text-xl font-semibold tracking-tight text-text">Rapports</h2>
+          <h2 className="font-display text-xl font-semibold tracking-tight text-text">
+            {t("nav.reports")}
+          </h2>
           <p className="text-sm text-text-muted">
-            {formatDate(from, branding.locale)} → {formatDate(to, branding.locale)}
-            {summary ? (
-              <>
-                {" "}
-                · <span className="tnum">{summary.days}</span> jour(s)
-              </>
-            ) : null}
+            {t("reports.rangeGenerated", {
+              from: formatDate(from, branding.locale),
+              to: formatDate(to, branding.locale),
+            })}
+            {summary ? <> · {t("reports.subtitle.days", { n: summary.days })}</> : null}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -293,7 +296,7 @@ export default function ReportsPage() {
             className="btn-ghost inline-flex items-center justify-center gap-2 px-4 py-2 text-sm"
           >
             <Printer className="h-4 w-4" />
-            Imprimer
+            {t("common.print")}
           </button>
           <button
             type="button"
@@ -302,7 +305,7 @@ export default function ReportsPage() {
             className="btn-ghost inline-flex items-center justify-center gap-2 px-4 py-2 text-sm disabled:opacity-50"
           >
             <Download className="h-4 w-4" />
-            Exporter CSV
+            {t("common.export")}
           </button>
         </div>
       </div>
@@ -320,7 +323,7 @@ export default function ReportsPage() {
                 preset === p.value ? "bg-surface text-text shadow-sm" : "text-text-muted",
               )}
             >
-              {p.label}
+              {t(p.labelKey)}
             </button>
           ))}
         </div>
@@ -351,44 +354,44 @@ export default function ReportsPage() {
       {/* Summary cards */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
         <StatCard
-          label="Ponctualité"
+          label={t("reports.stat.punctuality")}
           value={punctuality}
           icon={TrendingUp}
           tone="primary"
           loading={loading}
-          sub="Arrivées à l'heure"
+          sub={t("reports.stat.punctuality.sub")}
         />
         <StatCard
-          label="Présents / jour"
+          label={t("reports.stat.presentPerDay")}
           value={summary?.avg_present ?? 0}
           icon={UserCheck}
           tone="primary"
           loading={loading}
-          sub="Moyenne (jours ouvrés)"
+          sub={t("reports.stat.avgWorkdays")}
         />
         <StatCard
-          label="Retards / jour"
+          label={t("reports.stat.latePerDay")}
           value={summary?.avg_late ?? 0}
           icon={Clock}
           tone="accent"
           loading={loading}
-          sub="Moyenne (jours ouvrés)"
+          sub={t("reports.stat.avgWorkdays")}
         />
         <StatCard
-          label="Absents / jour"
+          label={t("reports.stat.absentPerDay")}
           value={summary?.avg_absent ?? 0}
           icon={UserX}
           tone="danger"
           loading={loading}
-          sub="Moyenne (jours ouvrés)"
+          sub={t("reports.stat.avgWorkdays")}
         />
         <StatCard
-          label="Heures / jour"
+          label={t("reports.stat.hoursPerDay")}
           value={summary ? formatDuration(summary.avg_worked_seconds) : "—"}
           icon={Timer}
           tone="info"
           loading={loading}
-          sub="Temps de présence moyen"
+          sub={t("reports.stat.avgPresence")}
         />
       </div>
 
@@ -396,8 +399,8 @@ export default function ReportsPage() {
       <div className="card p-5">
         <div className="mb-4 flex items-center justify-between">
           <div>
-            <h3 className="font-display font-semibold text-text">Présence quotidienne</h3>
-            <p className="text-xs text-text-muted">Présents, retards et absences par jour</p>
+            <h3 className="font-display font-semibold text-text">{t("reports.daily.title")}</h3>
+            <p className="text-xs text-text-muted">{t("reports.daily.sub")}</p>
           </div>
           <BarChart3 className="h-4 w-4 text-text-muted print:hidden" />
         </div>
@@ -408,8 +411,8 @@ export default function ReportsPage() {
         ) : (
           <EmptyState
             icon={BarChart3}
-            title="Aucune donnée"
-            description="Aucune présence enregistrée sur cette période."
+            title={t("reports.empty.title")}
+            description={t("reports.empty.chart")}
           />
         )}
       </div>
@@ -417,7 +420,7 @@ export default function ReportsPage() {
       {/* Departments */}
       <div>
         <h3 className="mb-3 font-display font-semibold text-text">
-          Par {term.departmentLabel.toLowerCase()}
+          {t("reports.byDepartment", { dept: term.departmentLabel.toLowerCase() })}
         </h3>
         <DataTable
           columns={departmentColumns}
@@ -428,8 +431,8 @@ export default function ReportsPage() {
           empty={
             <EmptyState
               icon={Building}
-              title="Aucune donnée"
-              description="Aucune présence par équipe sur cette période."
+              title={t("reports.empty.title")}
+              description={t("reports.empty.dept")}
             />
           }
         />
@@ -440,10 +443,10 @@ export default function ReportsPage() {
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <h3 className="font-display font-semibold text-text">
             {sort === "late"
-              ? "Top retards"
+              ? t("reports.top.late")
               : sort === "absences"
-                ? "Top absences"
-                : "Top heures de présence"}
+                ? t("reports.top.absences")
+                : t("reports.top.hours")}
           </h3>
           <div className="inline-flex rounded-lg border border-border bg-surface-2/40 p-1 print:hidden">
             {SORTS.map((s) => (
@@ -456,7 +459,7 @@ export default function ReportsPage() {
                   sort === s.value ? "bg-surface text-text shadow-sm" : "text-text-muted",
                 )}
               >
-                {s.label}
+                {t(s.labelKey)}
               </button>
             ))}
           </div>
@@ -470,8 +473,8 @@ export default function ReportsPage() {
           empty={
             <EmptyState
               icon={Clock}
-              title="Aucune donnée"
-              description="Aucun pointage individuel sur cette période."
+              title={t("reports.empty.title")}
+              description={t("reports.empty.members")}
             />
           }
         />

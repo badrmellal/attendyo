@@ -262,6 +262,36 @@ body {
   }
 }
 
+/* ===========================================================================
+   v3 Live Map — isometric zone twin. People dots fade in and (unless the user
+   prefers reduced motion — the component omits the drift class then) drift a
+   few px within their zone slab so the map feels alive without ever implying
+   desk-level precision.
+   =========================================================================== */
+.map-dot {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: map-dot-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.map-dot--drift {
+  animation:
+    map-dot-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) both,
+    map-drift var(--drift-dur, 6s) ease-in-out var(--drift-delay, 0s) infinite alternate;
+}
+@keyframes map-dot-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes map-drift {
+  to {
+    transform: translate(var(--dx, 0), var(--dy, 0));
+  }
+}
+
 /* Reduced motion: respect the user. */
 @media (prefers-reduced-motion: reduce) {
   *,

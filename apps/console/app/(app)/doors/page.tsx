@@ -24,6 +24,7 @@ import {
   Check,
   Power,
   MapPin,
+  Layers,
   Plus,
   Pencil,
   Trash2,
@@ -35,33 +36,38 @@ import { RowMenu, type RowAction } from "@/components/RowMenu";
 import { DoorDialog } from "@/components/DoorDialog";
 import { CameraDialog } from "@/components/CameraDialog";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { useBranding } from "@/components/BrandingProvider";
 import {
   deleteCamera,
   deleteDoor,
+  getZones,
   listCameras,
   listDoors,
   openDoor,
 } from "@/lib/api";
-import type { Camera, Door } from "@/lib/types";
-import { cn } from "@/lib/utils";
+import type { Camera, Door, Zone } from "@/lib/types";
+import { cn, formatNumber } from "@/lib/utils";
 
+// Driver names are proper nouns (Webhook / Pi GPIO / Simulation) — not localized.
 const DRIVER_META: Record<Door["driver"], { icon: typeof Globe; label: string }> = {
   webhook: { icon: Globe, label: "Webhook" },
   pi_gpio: { icon: Cpu, label: "Pi GPIO" },
   simulation: { icon: FlaskConical, label: "Simulation" },
 };
 
-const DIRECTION_META: Record<Door["direction"], { icon: typeof ArrowDownUp; label: string }> = {
-  both: { icon: ArrowDownUp, label: "Entrée / Sortie" },
-  in: { icon: ArrowDown, label: "Entrée" },
-  out: { icon: ArrowUp, label: "Sortie" },
+const DIRECTION_ICON: Record<Door["direction"], typeof ArrowDownUp> = {
+  both: ArrowDownUp,
+  in: ArrowDown,
+  out: ArrowUp,
 };
 
 type PulseState = "idle" | "opening" | "open" | "error";
 
 export default function DoorsPage() {
+  const { branding, t } = useBranding();
   const [doors, setDoors] = useState<Door[]>([]);
   const [cameras, setCameras] = useState<Camera[]>([]);
+  const [zones, setZones] = useState<Zone[]>([]);
   const [loading, setLoading] = useState(true);
   const [pulse, setPulse] = useState<Record<string, PulseState>>({});
 
@@ -79,11 +85,12 @@ export default function DoorsPage() {
 
   useEffect(() => {
     let active = true;
-    Promise.all([listDoors(), listCameras()])
-      .then(([d, c]) => {
+    Promise.all([listDoors(), listCameras(), getZones()])
+      .then(([d, c, z]) => {
         if (!active) return;
         setDoors(d);
         setCameras(c);
+        setZones(z);
       })
       .finally(() => active && setLoading(false));
     return () => {
@@ -140,7 +147,7 @@ export default function DoorsPage() {
   const cameraColumns: Column<Camera>[] = [
     {
       key: "name",
-      header: "Caméra",
+      header: t("cameras.col.name"),
       cell: (c) => (
         <div className="flex items-center gap-2.5">
           <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-surface-2/60 text-text-muted ring-1 ring-border">
@@ -157,22 +164,22 @@ export default function DoorsPage() {
     },
     {
       key: "door",
-      header: "Porte",
+      header: t("cameras.col.door"),
       cell: (c) => <span className="text-sm text-text-muted">{doorName(c.door_id)}</span>,
     },
     {
       key: "thresholds",
-      header: "Seuils",
+      header: t("cameras.col.thresholds"),
       cell: (c) => (
         <div className="space-y-0.5 text-xs text-text-muted">
           <p>
-            Reco{" "}
+            {t("cameras.reco")}{" "}
             <span className="tnum text-text">
               {Math.round(Number(c.recognition_threshold) * 100)}%
             </span>
           </p>
           <p>
-            Détection{" "}
+            {t("cameras.detection")}{" "}
             <span className="tnum text-text">
               {Math.round(Number(c.det_prob_threshold) * 100)}%
             </span>
@@ -182,12 +189,12 @@ export default function DoorsPage() {
     },
     {
       key: "status",
-      header: "Statut",
+      header: t("people.col.status"),
       align: "right",
       cell: (c) => (
         <div className="flex justify-end">
           <Pill tone={c.enabled ? "ok" : "muted"} dot>
-            {c.enabled ? "Active" : "Inactive"}
+            {c.enabled ? t("doors.status.active") : t("doors.status.inactive")}
           </Pill>
         </div>
       ),
@@ -200,12 +207,12 @@ export default function DoorsPage() {
       cell: (c) => {
         const actions: RowAction[] = [
           {
-            label: "Modifier",
+            label: t("common.edit"),
             icon: Pencil,
             onSelect: () => setCameraDialog({ open: true, camera: c }),
           },
           {
-            label: "Supprimer",
+            label: t("common.delete"),
             icon: Trash2,
             tone: "danger",
             onSelect: () => setDeletingCamera(c),
@@ -213,7 +220,7 @@ export default function DoorsPage() {
         ];
         return (
           <div className="flex justify-end">
-            <RowMenu actions={actions} label={`Actions pour ${c.name}`} />
+            <RowMenu actions={actions} label={t("people.rowActions", { name: c.name })} />
           </div>
         );
       },
@@ -226,11 +233,13 @@ export default function DoorsPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="font-display text-xl font-semibold tracking-tight text-text">
-            Portes & caméras
+            {t("nav.doors")}
           </h2>
-          <p className="text-sm text-text-muted">
-            <span className="tnum font-medium text-text">{doors.length}</span> portes ·{" "}
-            <span className="tnum font-medium text-text">{cameras.length}</span> caméras
+          <p className="text-sm text-text-muted tnum">
+            {t("doors.count", {
+              doors: formatNumber(doors.length, branding.locale),
+              cameras: formatNumber(cameras.length, branding.locale),
+            })}
           </p>
         </div>
         <button
@@ -239,7 +248,7 @@ export default function DoorsPage() {
           className="btn-primary inline-flex items-center justify-center gap-2 px-4 py-2 text-sm"
         >
           <Plus className="h-4 w-4" />
-          Ajouter une porte
+          {t("doors.add")}
         </button>
       </div>
 
@@ -257,15 +266,15 @@ export default function DoorsPage() {
       ) : doors.length === 0 ? (
         <EmptyState
           icon={DoorClosed}
-          title="Aucune porte configurée"
-          description="Ajoutez une porte et liez une caméra pour commencer le contrôle d'accès."
+          title={t("doors.empty.title")}
+          description={t("doors.empty.desc")}
           action={
             <button
               type="button"
               onClick={() => setDoorDialog({ open: true, door: null })}
               className="btn-primary inline-flex items-center gap-2 px-4 py-2 text-sm"
             >
-              <Plus className="h-4 w-4" /> Ajouter une porte
+              <Plus className="h-4 w-4" /> {t("doors.add")}
             </button>
           }
         />
@@ -273,7 +282,13 @@ export default function DoorsPage() {
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {doors.map((door) => {
             const Driver = DRIVER_META[door.driver];
-            const Direction = DIRECTION_META[door.direction];
+            const DirectionIcon = DIRECTION_ICON[door.direction];
+            const directionLabel =
+              door.direction === "both"
+                ? `${t("dir.in")} / ${t("dir.out")}`
+                : door.direction === "in"
+                  ? t("dir.in")
+                  : t("dir.out");
             const doorCameras = cameras.filter((c) => c.door_id === door.id);
             const state = pulse[door.id] ?? "idle";
             const opening = state === "opening";
@@ -281,12 +296,12 @@ export default function DoorsPage() {
 
             const doorActions: RowAction[] = [
               {
-                label: "Modifier",
+                label: t("common.edit"),
                 icon: Pencil,
                 onSelect: () => setDoorDialog({ open: true, door }),
               },
               {
-                label: "Supprimer",
+                label: t("common.delete"),
                 icon: Trash2,
                 tone: "danger",
                 onSelect: () => setDeletingDoor(door),
@@ -304,7 +319,7 @@ export default function DoorsPage() {
                 {/* door-open pulse */}
                 {opened && (
                   <span
-                    className="pointer-events-none absolute right-5 top-5 h-8 w-8 animate-pulse-ring rounded-full bg-primary/40"
+                    className="pointer-events-none absolute end-5 top-5 h-8 w-8 animate-pulse-ring rounded-full bg-primary/40"
                     aria-hidden
                   />
                 )}
@@ -338,23 +353,29 @@ export default function DoorsPage() {
                   </div>
                   <div className="flex items-center gap-1">
                     <Pill tone={door.enabled ? "ok" : "muted"} dot>
-                      {door.enabled ? "Active" : "Inactive"}
+                      {door.enabled ? t("doors.status.active") : t("doors.status.inactive")}
                     </Pill>
-                    <RowMenu actions={doorActions} label={`Actions pour ${door.name}`} />
+                    <RowMenu actions={doorActions} label={t("people.rowActions", { name: door.name })} />
                   </div>
                 </div>
 
                 {/* Metadata */}
                 <div className="mt-4 flex flex-wrap gap-2">
                   <Meta icon={Driver.icon} label={Driver.label} />
-                  <Meta icon={Direction.icon} label={Direction.label} />
-                  <Meta icon={Power} label={`Relock ${door.relock_seconds}s`} />
+                  <Meta icon={DirectionIcon} label={directionLabel} />
+                  <Meta icon={Power} label={t("doors.relock", { n: door.relock_seconds })} />
+                  {door.zone_id && (
+                    <Meta
+                      icon={Layers}
+                      label={zones.find((z) => z.id === door.zone_id)?.name ?? "Zone"}
+                    />
+                  )}
                 </div>
 
                 {/* Cameras */}
                 <div className="mt-4 space-y-1.5">
                   {doorCameras.length === 0 ? (
-                    <p className="text-xs text-text-muted">Aucune caméra liée</p>
+                    <p className="text-xs text-text-muted">{t("doors.noCamera")}</p>
                   ) : (
                     doorCameras.map((cam) => (
                       <div
@@ -366,7 +387,9 @@ export default function DoorsPage() {
                           <span className="text-sm text-text">{cam.name}</span>
                         </div>
                         <span className="tnum text-xs text-text-muted">
-                          seuil {Math.round(Number(cam.recognition_threshold) * 100)}%
+                          {t("doors.threshold", {
+                            n: Math.round(Number(cam.recognition_threshold) * 100),
+                          })}
                         </span>
                       </div>
                     ))
@@ -389,15 +412,15 @@ export default function DoorsPage() {
                   >
                     {opening ? (
                       <>
-                        <Loader2 className="h-4 w-4 animate-spin" /> Ouverture…
+                        <Loader2 className="h-4 w-4 animate-spin" /> {t("doors.opening")}
                       </>
                     ) : opened ? (
                       <>
-                        <Check className="h-4 w-4" /> Ouverte
+                        <Check className="h-4 w-4" /> {t("doors.opened")}
                       </>
                     ) : (
                       <>
-                        <DoorOpen className="h-4 w-4" /> Tester l'ouverture
+                        <DoorOpen className="h-4 w-4" /> {t("doors.test")}
                       </>
                     )}
                   </button>
@@ -412,9 +435,9 @@ export default function DoorsPage() {
       <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h3 className="font-display text-lg font-semibold tracking-tight text-text">
-            Caméras
+            {t("cameras.title")}
           </h3>
-          <p className="text-sm text-text-muted">Sources vidéo liées aux portes.</p>
+          <p className="text-sm text-text-muted">{t("cameras.subtitle")}</p>
         </div>
         <button
           type="button"
@@ -423,7 +446,7 @@ export default function DoorsPage() {
           className="btn-primary inline-flex items-center justify-center gap-2 px-4 py-2 text-sm disabled:opacity-50"
         >
           <Plus className="h-4 w-4" />
-          Ajouter une caméra
+          {t("cameras.add")}
         </button>
       </div>
 
@@ -436,11 +459,9 @@ export default function DoorsPage() {
         empty={
           <EmptyState
             icon={Webcam}
-            title="Aucune caméra"
+            title={t("cameras.empty.title")}
             description={
-              doors.length === 0
-                ? "Ajoutez d'abord une porte, puis liez-y une caméra."
-                : "Ajoutez une caméra et liez-la à une porte."
+              doors.length === 0 ? t("cameras.empty.needDoor") : t("cameras.empty.desc")
             }
             action={
               doors.length > 0 ? (
@@ -449,7 +470,7 @@ export default function DoorsPage() {
                   onClick={() => setCameraDialog({ open: true, camera: null })}
                   className="btn-primary inline-flex items-center gap-2 px-4 py-2 text-sm"
                 >
-                  <Plus className="h-4 w-4" /> Ajouter une caméra
+                  <Plus className="h-4 w-4" /> {t("cameras.add")}
                 </button>
               ) : undefined
             }
@@ -461,6 +482,7 @@ export default function DoorsPage() {
       <DoorDialog
         open={doorDialog.open}
         door={doorDialog.door}
+        zones={zones}
         onClose={() => setDoorDialog({ open: false, door: null })}
         onSaved={onDoorSaved}
       />
@@ -477,28 +499,18 @@ export default function DoorsPage() {
         open={deletingDoor !== null}
         onClose={() => setDeletingDoor(null)}
         onConfirm={confirmDeleteDoor}
-        title="Supprimer la porte"
-        confirmLabel="Supprimer"
-        description={
-          <p>
-            Supprimer <span className="font-medium text-text">{deletingDoor?.name}</span> ? Les
-            caméras liées seront aussi supprimées. Cette action est irréversible.
-          </p>
-        }
+        title={t("doors.delete.title")}
+        confirmLabel={t("common.delete")}
+        description={<p>{t("doors.delete.desc", { name: deletingDoor?.name ?? "" })}</p>}
       />
 
       <ConfirmDialog
         open={deletingCamera !== null}
         onClose={() => setDeletingCamera(null)}
         onConfirm={confirmDeleteCamera}
-        title="Supprimer la caméra"
-        confirmLabel="Supprimer"
-        description={
-          <p>
-            Supprimer <span className="font-medium text-text">{deletingCamera?.name}</span> ?
-            Cette action est irréversible.
-          </p>
-        }
+        title={t("cameras.delete.title")}
+        confirmLabel={t("common.delete")}
+        description={<p>{t("cameras.delete.desc", { name: deletingCamera?.name ?? "" })}</p>}
       />
     </div>
   );

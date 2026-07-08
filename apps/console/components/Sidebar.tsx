@@ -22,6 +22,9 @@ import {
   BellRing,
   KeyRound,
   UsersRound,
+  Boxes,
+  Zap,
+  Map as MapIcon,
   type LucideIcon,
 } from "lucide-react";
 import { BrandLogo } from "./BrandLogo";
@@ -50,6 +53,16 @@ const GROUPS: Group[] = [
       { href: "/alerts", labelKey: "nav.alerts", icon: BellRing },
       { href: "/doors", labelKey: "nav.doors", icon: DoorOpen },
       { href: "/groups", labelKey: "nav.groups", icon: KeyRound },
+    ],
+  },
+  {
+    // v3 "Espace" — spatial intelligence. The sibling /map (Live map) entry
+    // belongs in THIS group; add it here rather than a second spatial section.
+    titleKey: "nav.section.spatial",
+    items: [
+      { href: "/map", labelKey: "nav.map", icon: MapIcon },
+      { href: "/zones", labelKey: "nav.zones", icon: Boxes },
+      { href: "/energy", labelKey: "nav.energy", icon: Zap },
     ],
   },
   {
@@ -139,8 +152,8 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         <div className="flex items-center gap-2.5 rounded-lg bg-surface-2/40 px-3 py-2.5">
           <ShieldCheck className="h-4 w-4 shrink-0 text-primary" />
           <div className="leading-tight">
-            <p className="text-xs font-medium text-text">On-premise</p>
-            <p className="text-[11px] text-text-muted">Runs on your LAN. No cloud.</p>
+            <p className="text-xs font-medium text-text">{t("common.onprem.title")}</p>
+            <p className="text-[11px] text-text-muted">{t("common.onprem.sub")}</p>
           </div>
         </div>
       </div>

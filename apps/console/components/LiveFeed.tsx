@@ -55,7 +55,7 @@ export function LiveFeed({
   variant?: "panel" | "bleed";
   onLive?: (live: boolean) => void;
 }) {
-  const { branding, decisionLabel } = useBranding();
+  const { branding, decisionLabel, t } = useBranding();
   const [events, setEvents] = useState<AccessEvent[]>([]);
   const seen = useRef<Set<number>>(new Set());
 
@@ -103,7 +103,7 @@ export function LiveFeed({
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <span className="truncate font-medium text-text">
-                  {ev.member_name || decisionLabel("unknown_face")}
+                  {ev.member_name || t("feed.unknown")}
                 </span>
                 <DirectionGlyph direction={ev.direction} />
               </div>
@@ -139,7 +139,7 @@ export function LiveFeed({
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary/40" />
             <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-primary" />
           </span>
-          Listening for access events…
+          {t("feed.listening")}
         </li>
       )}
     </ul>

@@ -36,7 +36,7 @@ import { cn, formatDuration, formatTime, shiftDate, todayISO } from "@/lib/utils
 type RangeMode = "day" | "range";
 
 export default function AttendancePage() {
-  const { branding, term } = useBranding();
+  const { branding, term, t } = useBranding();
   const [mode, setMode] = useState<RangeMode>("day");
   const [date, setDate] = useState(todayISO());
   const [from, setFrom] = useState(shiftDate(todayISO(), -6));
@@ -85,7 +85,7 @@ export default function AttendancePage() {
   const columns: Column<AttendanceDay>[] = [
     {
       key: "member",
-      header: "Personne",
+      header: t("dash.col.person"),
       cell: (r) => (
         <div className="flex items-center gap-3">
           <Avatar name={r.member_name} size={32} />
@@ -102,7 +102,7 @@ export default function AttendancePage() {
       ? [
           {
             key: "date",
-            header: "Date",
+            header: t("att.col.date"),
             cell: (r: AttendanceDay) => (
               <span className="tnum text-sm text-text-muted">{r.work_date}</span>
             ),
@@ -111,7 +111,7 @@ export default function AttendancePage() {
       : []),
     {
       key: "first_in",
-      header: "Première entrée",
+      header: t("att.col.firstIn"),
       cell: (r) =>
         r.first_in_ts ? (
           <span className="tnum inline-flex items-center gap-1.5 text-sm text-text">
@@ -124,7 +124,7 @@ export default function AttendancePage() {
     },
     {
       key: "last_out",
-      header: "Dernière sortie",
+      header: t("att.col.lastOut"),
       cell: (r) =>
         r.last_out_ts ? (
           <span className="tnum inline-flex items-center gap-1.5 text-sm text-text">
@@ -137,13 +137,13 @@ export default function AttendancePage() {
     },
     {
       key: "hours",
-      header: "Heures",
+      header: t("att.col.hours"),
       align: "right",
       cell: (r) => <span className="tnum text-sm text-text">{formatDuration(r.worked_seconds)}</span>,
     },
     {
       key: "status",
-      header: "Statut",
+      header: t("people.col.status"),
       align: "right",
       cell: (r) => (
         <div className="flex justify-end">
@@ -158,8 +158,10 @@ export default function AttendancePage() {
       {/* Header + export */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="font-display text-xl font-semibold tracking-tight text-text">Présence</h2>
-          <p className="text-sm text-text-muted">Entrées et sorties, par jour.</p>
+          <h2 className="font-display text-xl font-semibold tracking-tight text-text">
+            {t("nav.attendance")}
+          </h2>
+          <p className="text-sm text-text-muted">{t("att.subtitle")}</p>
         </div>
         <button
           type="button"
@@ -168,7 +170,7 @@ export default function AttendancePage() {
           className="btn-ghost inline-flex items-center justify-center gap-2 px-4 py-2 text-sm disabled:opacity-50"
         >
           <Download className="h-4 w-4" />
-          Exporter CSV
+          {t("common.export")}
         </button>
       </div>
 
@@ -183,7 +185,7 @@ export default function AttendancePage() {
               mode === "day" ? "bg-surface text-text shadow-sm" : "text-text-muted",
             )}
           >
-            <Calendar className="h-4 w-4" /> Jour
+            <Calendar className="h-4 w-4" /> {t("common.day")}
           </button>
           <button
             type="button"
@@ -193,7 +195,7 @@ export default function AttendancePage() {
               mode === "range" ? "bg-surface text-text shadow-sm" : "text-text-muted",
             )}
           >
-            <CalendarRange className="h-4 w-4" /> Période
+            <CalendarRange className="h-4 w-4" /> {t("common.range")}
           </button>
         </div>
 
@@ -203,7 +205,7 @@ export default function AttendancePage() {
               type="button"
               onClick={() => setDate((d) => shiftDate(d, -1))}
               className="btn-ghost flex h-9 w-9 items-center justify-center"
-              aria-label="Jour précédent"
+              aria-label={t("att.prevDay")}
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
@@ -222,7 +224,7 @@ export default function AttendancePage() {
               onClick={() => setDate((d) => (d < todayISO() ? shiftDate(d, 1) : d))}
               disabled={date >= todayISO()}
               className="btn-ghost flex h-9 w-9 items-center justify-center disabled:opacity-40"
-              aria-label="Jour suivant"
+              aria-label={t("att.nextDay")}
             >
               <ChevronRight className="h-4 w-4" />
             </button>
@@ -251,10 +253,10 @@ export default function AttendancePage() {
 
       {/* Summary strip */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <SummaryChip label="Présents" value={summary.present} tone="primary" />
-        <SummaryChip label="En retard" value={summary.late} tone="accent" />
-        <SummaryChip label="Incomplets" value={summary.incomplete} tone="info" />
-        <SummaryChip label="Absents" value={summary.absent} tone="danger" />
+        <SummaryChip label={t("stat.present")} value={summary.present} tone="primary" />
+        <SummaryChip label={t("stat.late")} value={summary.late} tone="accent" />
+        <SummaryChip label={t("att.summary.incomplete")} value={summary.incomplete} tone="info" />
+        <SummaryChip label={t("stat.absent")} value={summary.absent} tone="danger" />
       </div>
 
       {/* Table */}
@@ -266,8 +268,8 @@ export default function AttendancePage() {
         empty={
           <EmptyState
             icon={CalendarDays}
-            title="Aucune donnée de présence"
-            description="Aucun enregistrement pour cette période."
+            title={t("att.empty.title")}
+            description={t("att.empty.desc")}
           />
         }
       />
