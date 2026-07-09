@@ -151,7 +151,7 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
       alertKindLabel: (k) => alertKindLabel(branding.locale, k),
       alertSeverityLabel: (s) => alertSeverityLabel(branding.locale, s),
       directionLabel: (dr) => directionLabel(branding.locale, dr),
-      term: terminologyLabels(branding.terminology),
+      term: terminologyLabels(branding.terminology, branding.locale),
     }),
     [branding, loading, theme, toggleTheme, setBranding, refresh],
   );

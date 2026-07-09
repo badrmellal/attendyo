@@ -226,10 +226,19 @@ export type SecurityConfig = {
   alert_cooldown_seconds: number;
 };
 
+/** `settings.site` — working-day config that drives late & overtime math. */
+export type SiteConfig = {
+  timezone: string;
+  workday_start: string; // HH:MM
+  workday_end: string; // HH:MM
+  grace_minutes: number;
+};
+
 export type Settings = {
   branding: Branding;
   attendance: AttendanceConfig;
   security: SecurityConfig;
+  site: SiteConfig;
 };
 
 /** `POST /api/auth/login` */

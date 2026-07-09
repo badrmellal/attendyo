@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Any, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 # --------------------------------------------------------------------------- #
 # Enumerations (kept as Literals to match the contract's string unions)
@@ -343,10 +343,30 @@ class SecuritySettings(BaseModel):
     alert_cooldown_seconds: int = 45
 
 
+class SiteSettings(BaseModel):
+    """Working-day config (from the site row) — drives late & overtime math."""
+
+    timezone: str = "Africa/Casablanca"
+    workday_start: str = "09:00"   # HH:MM
+    workday_end: str = "18:00"     # HH:MM
+    grace_minutes: int = 10
+
+    @field_validator("workday_start", "workday_end")
+    @classmethod
+    def _valid_hhmm(cls, v: str) -> str:
+        try:
+            h, m = v.split(":")
+            assert 0 <= int(h) <= 23 and 0 <= int(m) <= 59
+        except Exception as exc:  # noqa: BLE001
+            raise ValueError("time must be HH:MM") from exc
+        return v
+
+
 class SettingsOut(BaseModel):
     branding: Branding
     attendance: AttendanceSettings
     security: SecuritySettings
+    site: SiteSettings
 
 
 class SettingsUpdate(BaseModel):
@@ -355,6 +375,7 @@ class SettingsUpdate(BaseModel):
     branding: Optional[Branding] = None
     attendance: Optional[AttendanceSettings] = None
     security: Optional[SecuritySettings] = None
+    site: Optional[SiteSettings] = None
 
 
 # --------------------------------------------------------------------------- #

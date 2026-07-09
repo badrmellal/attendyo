@@ -23,6 +23,7 @@ from ..models.schemas import (
     AttendanceSettings,
     Branding,
     SecuritySettings,
+    SiteSettings,
     SettingsOut,
     SettingsUpdate,
 )
@@ -75,11 +76,29 @@ def load_security() -> SecuritySettings:
     )
 
 
+def load_site() -> SiteSettings:
+    """Working-day config from the single site row (drives late/overtime math)."""
+    row = db.query_one(
+        "SELECT timezone, workday_start, workday_end, grace_minutes "
+        "FROM sites ORDER BY created_at LIMIT 1"
+    )
+    if not row:
+        return SiteSettings()
+    return SiteSettings(
+        timezone=row["timezone"],
+        # times come back as datetime.time — serialize to HH:MM for the wire.
+        workday_start=row["workday_start"].strftime("%H:%M") if row.get("workday_start") else "09:00",
+        workday_end=row["workday_end"].strftime("%H:%M") if row.get("workday_end") else "18:00",
+        grace_minutes=int(row["grace_minutes"]),
+    )
+
+
 def _read_settings() -> SettingsOut:
     return SettingsOut(
         branding=load_branding(),
         attendance=load_attendance(),
         security=load_security(),
+        site=load_site(),
     )
 
 
@@ -101,6 +120,16 @@ def _write_settings(update: SettingsUpdate) -> SettingsOut:
             "INSERT INTO settings (key, value) VALUES ('security', %s::jsonb) "
             "ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
             (json.dumps(update.security.model_dump()),),
+        )
+    if update.site is not None:
+        s = update.site
+        # Update the single site row (create-then-set is out of scope; a site
+        # always exists after seeding). Times validated by the SiteSettings schema.
+        db.execute(
+            "UPDATE sites SET timezone = %s, workday_start = %s, workday_end = %s, "
+            "grace_minutes = %s "
+            "WHERE id = (SELECT id FROM sites ORDER BY created_at LIMIT 1)",
+            (s.timezone, s.workday_start, s.workday_end, max(0, s.grace_minutes)),
         )
     return _read_settings()
 

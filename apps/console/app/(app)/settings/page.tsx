@@ -17,13 +17,14 @@ import {
   Loader2,
   Globe,
   ArrowDownLeft,
+  Clock,
 } from "lucide-react";
 import { BrandMark } from "@/components/BrandLogo";
 import { Pill } from "@/components/StatusPill";
 import { useBranding } from "@/components/BrandingProvider";
 import { getSettings, putSettings } from "@/lib/api";
 import { applyBrandingColors } from "@/lib/branding";
-import { TERMINOLOGY_PRESETS, memberTypeOptions, terminologyLabels } from "@/lib/terminology";
+import { terminologyPresetOptions, memberTypeOptions, terminologyLabels } from "@/lib/terminology";
 import { decisionLabel as decisionLabelFor, statusLabel as statusLabelFor } from "@/lib/i18n";
 import type { Branding, Locale, Settings } from "@/lib/types";
 import { cn, hexToRgbTriplet } from "@/lib/utils";
@@ -51,6 +52,12 @@ export default function SettingsPage() {
           ...s,
           branding: { ...s.branding, terminology: s.branding.terminology ?? "workforce" },
           security: s.security ?? { alert_cooldown_seconds: 45 },
+          site: s.site ?? {
+            timezone: "Africa/Casablanca",
+            workday_start: "09:00",
+            workday_end: "18:00",
+            grace_minutes: 10,
+          },
         };
         setSettings(normalized);
         setDraft(normalized);
@@ -88,6 +95,11 @@ export default function SettingsPage() {
 
   function patchSecurity(patch: Partial<Settings["security"]>) {
     setDraft((d) => (d ? { ...d, security: { ...d.security, ...patch } } : d));
+    setSaved(false);
+  }
+
+  function patchSite(patch: Partial<Settings["site"]>) {
+    setDraft((d) => (d ? { ...d, site: { ...d.site, ...patch } } : d));
     setSaved(false);
   }
 
@@ -129,8 +141,9 @@ export default function SettingsPage() {
   const b = draft.branding;
   const primaryValid = !!hexToRgbTriplet(b.primary_color);
   const accentValid = !!hexToRgbTriplet(b.accent_color);
-  // Live terminology preview — recomputed as the draft preset changes.
-  const termPreview = terminologyLabels(b.terminology);
+  // Live terminology preview — recomputed as the draft preset + locale change.
+  const termPreview = terminologyLabels(b.terminology, b.locale);
+  const presetOptions = terminologyPresetOptions(b.locale);
 
   return (
     <div className="space-y-5">
@@ -247,7 +260,7 @@ export default function SettingsPage() {
 
             <Field label={t("settings.field.terminology")} className="mt-4">
               <div className="grid gap-2 sm:grid-cols-3">
-                {TERMINOLOGY_PRESETS.map((p) => (
+                {presetOptions.map((p) => (
                   <button
                     key={p.value}
                     type="button"
@@ -317,6 +330,47 @@ export default function SettingsPage() {
                 onChange={(v) => patchAttendance({ auto_open_on_grant: v })}
               />
             </label>
+          </section>
+
+          {/* Working day — drives late & overtime math */}
+          <section className="card p-6">
+            <div className="mb-5 flex items-center gap-2.5">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/10 text-accent ring-1 ring-accent/20">
+                <Clock className="h-4 w-4" />
+              </span>
+              <div>
+                <h3 className="font-display font-semibold text-text">{t("settings.workday.title")}</h3>
+                <p className="text-xs text-text-muted">{t("settings.workday.sub")}</p>
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-3">
+              <Field label={t("settings.field.workdayStart")}>
+                <input
+                  type="time"
+                  className="field w-full px-3 py-2 text-sm tnum"
+                  value={draft.site.workday_start}
+                  onChange={(e) => patchSite({ workday_start: e.target.value })}
+                />
+              </Field>
+              <Field label={t("settings.field.workdayEnd")}>
+                <input
+                  type="time"
+                  className="field w-full px-3 py-2 text-sm tnum"
+                  value={draft.site.workday_end}
+                  onChange={(e) => patchSite({ workday_end: e.target.value })}
+                />
+              </Field>
+              <Field label={t("settings.field.grace")}>
+                <input
+                  type="number"
+                  min={0}
+                  className="field w-full px-3 py-2 text-sm tnum"
+                  value={draft.site.grace_minutes}
+                  onChange={(e) => patchSite({ grace_minutes: Number(e.target.value) || 0 })}
+                />
+              </Field>
+            </div>
           </section>
 
           {/* Security config (v2.1 Smart Gate) */}
@@ -406,7 +460,7 @@ export default function SettingsPage() {
               <div className="rounded-lg bg-surface-2/40 px-3 py-2.5">
                 <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">
                   {t("settings.preview.terminology")} —{" "}
-                  {TERMINOLOGY_PRESETS.find((p) => p.value === b.terminology)?.label}
+                  {presetOptions.find((p) => p.value === b.terminology)?.label}
                 </p>
                 <p className="mt-1.5 text-xs text-text-muted">
                   {t("settings.preview.menu")} :{" "}

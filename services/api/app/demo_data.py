@@ -283,25 +283,34 @@ def _seed_attendance_and_events(
     grace_cutoff = dt.time(9, 10)  # 09:00 + 10 min grace
     today = dt.datetime.now(tz).date()
 
-    # A week of history (including today).
-    for day_offset in range(6, -1, -1):
+    # Two "chronically late" personas (by roster index) so questions like
+    # "who has been late more than 5 times this month?" return real rows on any
+    # realistic demo day — they arrive late almost every workday.
+    chronic_late_idx = {1, 2}
+
+    # ~5 weeks of history (including today) so month-to-date and 30-day windows
+    # for reports / insights / Ask all have enough data to be interesting.
+    for day_offset in range(34, -1, -1):
         work_date = today - dt.timedelta(days=day_offset)
         # Skip weekends in the demo (Sat=5, Sun=6).
         if work_date.weekday() >= 5:
             continue
         is_today = work_date == today
 
-        for member in members:
+        for idx, member in enumerate(members):
             # Members outside their validity window can't have entered that day.
             if not _within_window(member, work_date):
                 continue
-            # ~12% chance absent on a given weekday; visitors more sporadic.
+            chronic = idx in chronic_late_idx
+            # ~12% chance absent on a given weekday; visitors more sporadic;
+            # the chronic-late personas are reliably present (so they rack up lates).
             absent_chance = 0.30 if member["member_type"] == "visitor" else 0.12
-            if _RNG.random() < absent_chance:
+            if not chronic and _RNG.random() < absent_chance:
                 continue  # absent — no attendance row, surfaced by read layer
 
             # Morning arrival: mostly 08:30–09:05, sometimes late to ~09:45.
-            late_today = _RNG.random() < 0.18
+            # Chronic personas are late ~90% of days.
+            late_today = _RNG.random() < (0.9 if chronic else 0.18)
             if late_today:
                 in_minute = _RNG.randint(11, 46)  # after the 09:10 cutoff
             else:

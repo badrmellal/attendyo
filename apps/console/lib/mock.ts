@@ -476,6 +476,12 @@ export const MOCK_SETTINGS: Settings = {
   security: {
     alert_cooldown_seconds: 45,
   },
+  site: {
+    timezone: "Africa/Casablanca",
+    workday_start: "09:00",
+    workday_end: "18:00",
+    grace_minutes: 10,
+  },
 };
 
 // In-memory mutable copy so Settings edits "stick" within a session.
@@ -1037,9 +1043,17 @@ export function mockReportsMembers(
   limit = 15,
 ): MemberReport[] {
   const workdays = dateRange(from, to).filter((d) => !isWeekend(d)).length || 1;
-  const rows: MemberReport[] = reportRoster().map((m) => {
-    const late_days = seededInt(`${m.id}-${from}-l`, Math.max(2, Math.round(workdays * 0.45)));
-    const absent_days = seededInt(`${m.id}-${from}-a`, Math.max(2, Math.round(workdays * 0.25)));
+  // Two "chronically late" personas (by roster index) so "who was late more than
+  // 5 times this month?" returns real rows on any realistic demo day — mirrors
+  // the API's demo seeding.
+  const rows: MemberReport[] = reportRoster().map((m, i) => {
+    const chronic = i === 1 || i === 2;
+    const late_days = chronic
+      ? Math.min(workdays, Math.max(6, Math.round(workdays * 0.9)))
+      : seededInt(`${m.id}-${from}-l`, Math.max(2, Math.round(workdays * 0.45)));
+    const absent_days = chronic
+      ? 0
+      : seededInt(`${m.id}-${from}-a`, Math.max(2, Math.round(workdays * 0.25)));
     const present_days = Math.max(0, workdays - late_days - absent_days);
     const attendedDays = present_days + late_days;
     const arrivalMin = 8 * 60 + 25 + seededInt(`${m.id}-arr`, 70);
